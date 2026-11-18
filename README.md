@@ -1,204 +1,179 @@
-# Route136 — BRACU CSE Course Tracker & Degree Companion
-
 <div align="center">
 
+<br />
 
-![Route136 Banner](public/icon.svg)
->>>>>>> 75e55a9 (Ui changes And New Name)
+<img src="public/logo-white.png" alt="Route136 White Logo" width="96" height="96" />
 
-**Your BRACU CSE Curriculum, Minus the Complexity.**  
-*Interactive Progress Tracker • Prerequisite DAG Validator • CGPA ROI Analyzer • Zero-Database Google Drive Cloud Sync*
+# Route136
 
-[![Next.js 16](https://img.shields.io/badge/Next.js-16.2.10%20(Turbopack)-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![React 19](https://img.shields.io/badge/React-19.0.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Google Drive API](https://img.shields.io/badge/Google_Drive-App_Data_Sync-4285F4?style=for-the-badge&logo=googledrive)](https://developers.google.com/drive)
-[![Antigravity](https://img.shields.io/badge/Antigravity-AGY%20Enabled-4285F4?style=for-the-badge&logo=google)](https://antigravity.google)
+**Your BRACU CSE curriculum, engineered for clarity.**
+
+`136 Credits` • `Pre-req Chain Engine` • `Semester Performance Charts` • `Target CGPA & Retake ROI` • `Zero-Database Google Drive Sync`
+
+<p>
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16.4.6%20(Turbopack)-0a0a0a?style=flat-square&logo=next.js&logoColor=white" alt="Next.js" /></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.2.4-0a0a0a?style=flat-square&logo=react&logoColor=61DAFB" alt="React" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0-0a0a0a?style=flat-square&logo=typescript&logoColor=3178C6" alt="TypeScript" /></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-4.0-0a0a0a?style=flat-square&logo=tailwindcss&logoColor=06B6D4" alt="Tailwind CSS" /></a>
+  <a href="https://developers.google.com/drive"><img src="https://img.shields.io/badge/Google_Drive-AppData_Sync-0070f3?style=flat-square&logo=googledrive&logoColor=white" alt="Google Drive API" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-0a0a0a?style=flat-square" alt="License: MIT" /></a>
+</p>
+
+<p>
+  <a href="#-overview">Overview</a> •
+  <a href="#-system-capabilities">System Capabilities</a> •
+  <a href="#-136-credit-curriculum-architecture">136-Credit Architecture</a> •
+  <a href="#-zero-database-privacy--cloud-sync">Privacy &amp; Cloud Sync</a> •
+  <a href="#-getting-started">Getting Started</a> •
+  <a href="#-project-structure">Project Structure</a>
+</p>
+
+<br />
 
 </div>
 
 ---
 
-## 📌 Table of Contents
-
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-  - [1. 136-Credit Degree & Prerequisite Graph](#1-136-credit-degree--prerequisite-graph)
-  - [2. CGPA Engine & Retake ROI Calculator](#2-cgpa-engine--retake-roi-calculator)
-  - [3. GenEd Distribution & Credit Auditing](#3-gened-distribution--credit-auditing)
-  - [4. Target GPA Forward Solver](#4-target-gpa-forward-solver)
-  - [5. Snapshot Progress Exporter](#5-snapshot-progress-exporter)
-- [Authentication & Zero-Database Architecture](#-authentication--zero-database-architecture)
-  - [G-Suite Domain Gatekeeper (`@g.bracu.ac.bd`)](#g-suite-domain-gatekeeper-gbracuacbd)
-  - [Private Google Drive `appDataFolder` Sync](#private-google-drive-appdatafolder-sync)
-  - [Guest Session (Local Storage Only)](#guest-session-local-storage-only)
-- [Local Development & Setup](#-local-development--setup)
-- [AI-Assisted Development (Antigravity)](#-ai-assisted-development-antigravity)
-- [Project Structure](#-project-structure)
-- [Disclaimer & License](#-disclaimer--license)
+> **`[ route136.app/workspace ]`** — Built specifically for **BRAC University (BRACU) CSE** undergraduate students. No centralized servers, no manual spreadsheet formulas, and full client-side data sovereignty.
 
 ---
 
-## 🚀 Overview
+## `[ OVERVIEW ]`
 
-**Route136** is an open-source, client-first academic degree companion crafted specifically for Computer Science & Engineering (CSE) undergraduate students at **BRAC University (BRACU)**. 
+Planning a **136-credit** BRACU CSE degree means juggling multi-tier prerequisite chains, 5-stream General Education (GenEd) rules, Residential Semester (`TARC`) requirements, and retake grade-replacement math.
 
-Navigating a 136-credit undergraduate engineering curriculum with intricate prerequisite dependency chains, strict General Education (GenEd) requirements, and retake grade replacement rules can be daunting. Route136 gives students a visual, interactive dashboard to plan their semesters, validate course prerequisites in real time, forecast CGPAs, and seamlessly back up their academic records directly to their personal Google Drive.
-
----
-
-## ✨ Key Features
-
-### 1. 136-Credit Degree & Prerequisite Graph
-- **Real-Time Dependency Evaluation**: Dynamically validates prerequisite chains (e.g., `CSE110` → `CSE111` → `CSE220` → `CSE221` / `CSE321`).
-- **Interactive Course Nodes**: Toggle course completion states (`Completed`, `In-Progress`, `Planned`, or `Untaken`) with immediate feedback on which downstream courses unlock.
-- **Visual Semester Roadmaps**: Explore recommended sequence pathways through the interactive **"Feeling lost?"** modal.
-
-### 2. CGPA Engine & Retake ROI Calculator
-- **Grade Point & Credit Engine**: Calculates exact semester GPA and cumulative CGPA across all completed courses following the official BRACU 4.0 grading scale.
-- **Accurate Retake Replacement**: Correctly computes retake scenarios by replacing earlier course attempts while strictly preserving completed credits and cumulative points.
-- **Retake ROI Analyzer**: Simulates grade improvements (e.g., retaking a `C` to an `A`) to display exact numerical CGPA returns before committing to registration.
-
-### 3. GenEd Distribution & Credit Auditing
-- Validates required distributions across General Education knowledge streams:
-  - **Natural Sciences (Non-Major Lab & Theory)**
-  - **Arts & Humanities** (Philosophy, Literature, Ethics)
-  - **Social Sciences & Government**
-- Tracks remaining elective credits and alerts students when distribution thresholds are met.
-
-### 4. Target GPA Forward Solver
-- Input a target graduation CGPA (e.g., `3.50` or `3.80`) and have Route136 calculate the exact average GPA required across your remaining semester credits to reach your goal.
-
-### 5. Snapshot Progress Exporter
-- Export your entire academic progress graph and completed course status as a clean, high-resolution PNG image directly from the browser for offline reference or academic advising sessions.
+**Route136** replaces fragile spreadsheets with a high-contrast, Vercel-inspired workspace featuring:
+- A streamlined **3-Step Setup Wizard** that builds 12 semesters without auto-dumping unwanted courses into future terms.
+- An interactive **Pre-req Chain Explorer** showing every CSE, MNS & BIL dependency sequence and how many courses remain.
+- Real-time **Semester Performance Charts**, **Target CGPA Solver**, **Retake ROI Analyzer**, and **4K Grade Sheet PNG Snapshot** exports.
 
 ---
 
-## 🔒 Authentication & Zero-Database Architecture
+## `[ SYSTEM CAPABILITIES ]`
 
-Route136 adopts a **Zero-Database Privacy Architecture**. No personal academic data, student IDs, or course plans are stored on third-party servers or databases.
+| Capability | Badge | Description |
+| :--- | :--- | :--- |
+| **Interactive Prerequisite Chains** | `PRE-REQ CHAIN` | Visualize every **CSE**, **MNS**, **BIL**, and **Major Elective** sequence in one flowchart. Track **`X / Y Completed • Z Left`** per chain, spot **`Ready Next`** courses, and inspect Hard (`HP`) / Soft (`SP`) prerequisites. |
+| **Semester Performance Charts** | `TRAJECTORY` | Interactive term-by-term **SGPA bar chart** with an editable graduation **Target Goal** reference line (`Goal: 3.50`) in the header, peak semester highlight, and 1-click **Quick Grade Entry**. |
+| **Target CGPA Solver & Retake ROI** | `TRAJECTORY ENGINE` | Compute the exact GPA required across remaining credits to hit your target CGPA, and simulate single or multi-course retakes ranked by exact cumulative CGPA boost. |
+| **Multi-Semester Course Builder** | `COURSE PICKER` | Horizontal semester tab switcher (`Sem 1`, `Sem 2`, `RS`, etc.) to populate multiple semesters in one session—including **in-batch Retake / Repeat Course** confirmation across terms. |
+| **3-Step Timeline Setup Wizard** | `12-SEM PLANNER` | Pick your Current Semester (`1st`–`12th`), Starting Intake, and flexible **RS placement** (including custom semester # or *Not Sure Yet*), with inline `ENG102` / `BU201` RS selection. |
+| **Updated 136-Credit OBE Roadmap** | `SYLLABUS` | Color-coded **Curriculum Roadmap** aligned with the updated BRACU CSE Degree Plan—covering Program Core (with `CSE110`/`CSE260` cross-listings), School Core, 5 GenEd Streams, and 2 Free GenEd Electives. |
+| **Grade Sheet PNG Snapshot** | `EXPORT` | High-resolution dark-mode transcript snapshot featuring combined **Degree Progress & CGPA**, detailed **Core/MNS/Electives/Thesis** & **GenEd** progress bars, coursework table, and developer attribution. |
+| **Zero-Database Cloud Sync** | `G-SUITE` | Instant **Guest Mode** (`localStorage`) or verified **`@g.bracu.ac.bd`** Google OAuth sync strictly to your private Google Drive `appDataFolder`. |
+
+---
+
+## `[ 136-CREDIT CURRICULUM ARCHITECTURE ]`
+
+Pre-configured with the official **BRACU CSE 136-Credit OBE Syllabus** (132 academic credits + 4 non-academic Capstone credits):
+
+| Category | Required Courses | Credit Load | Key Modules &amp; Rules |
+| :--- | :---: | :---: | :--- |
+| **Program Core (CSE)** | 25 Courses | **75 Cr** | `CSE110` *(CSE161/EEE/ECE103)*, `CSE111`, `CSE220`, `CSE221`, `CSE230`, `CSE250`, `CSE251`, `CSE260` *(EEE/ECE283/301)*, `CSE320`–`CSE471` |
+| **Program Electives** | 2 Courses | **6 Cr** | Minimum 1 CSE elective; 2nd may be CSE, COD/GenEd, Minor, or 2nd Major |
+| **Project / Internship / Thesis** | 1 Course | **4 Cr** | `CSE400` (Final Year Capstone) |
+| **School Core (MNS)** | 4 Courses | **12 Cr** | `MAT120`, `MAT215`, `MAT216`, `PHY112` |
+| **University Core: Stream 1 (BIL)** | 2 Courses | **6 Cr** | `ENG101` + `ENG102` *(or `ENG102` + `ENG103` for ENG102 freshers; `ENG091` 0-cr support)* |
+| **University Core: Stream 2 (MNS)** | 3 Courses | **9 Cr** | `MAT110`, `PHY111`, `STA201` *(+ optional `CHE101`, `BIO101`, `ENV103`, `GSC110`; `MAT092` 0-cr support)* |
+| **University Core: Stream 3 (Arts)** | 3 Courses | **9 Cr** | `HUM103`, `BNG103` + min 1 from `HUM101`–`HUM301`, `HST102`–`HST104`, `ENG110`–`ENG333` |
+| **University Core: Stream 4 (Social)** | 2 Courses | **6 Cr** | `EMB101` / `DEV101` + min 1 from `PSY101`, `SOC101`, `ECO101`, `POL101`, `BU201`, etc. |
+| **University Core: Stream 5 (CST)** | 1 Course | **3 Cr** | Min 1 from `CST201`–`CST333`, `BUS334` |
+| **GenEd Electives (Free Choice)** | 2 Courses | **6 Cr** | Any 2 courses from Streams 2–5 or outside the CSE department |
+| **Total Degree Requirement** | **45 Courses** | **136 Cr** | **Full Graduation Audit &amp; Prerequisite Chain Tracking** |
+
+---
+
+## `[ ZERO-DATABASE PRIVACY & CLOUD SYNC ]`
+
+Route136 runs on a **100% Client-Side Architecture**. No grades, student IDs, or academic plans are ever stored on any centralized server.
 
 ```mermaid
-flowchart TD
-    User["Student User"] --> Choice{"Entry Selection"}
-    Choice -->|"Sign in (G-Suite)"| OAuth["Google OAuth 2.0<br/>(Strict Domain: @g.bracu.ac.bd)"]
-    Choice -->|"Continue as Guest"| Local["Browser LocalStorage<br/>(Device-Only, No Cloud)"]
-    
-    OAuth -->|"Verified BRACU Account"| Token["Session Access Token<br/>(In-Memory Only)"]
-    OAuth -->|"Non-BRACU Domain"| Block["Gatekeeper Error<br/>(Access Blocked)"]
-    
-    Token --> CloudSync["Google Drive API<br/>(appDataFolder Scope)"]
-    CloudSync <-->|"Serialized JSON Payload"| Drive["Private Google Drive<br/>(Hidden App Data Folder)"]
+flowchart LR
+    Student["BRACU Student"] --> Mode{"Workspace Mode"}
+    Mode -->|"BRACU G-Suite Sign-In"| Gatekeeper["OAuth 2.0 Gatekeeper<br/>(@g.bracu.ac.bd)"]
+    Mode -->|"Continue as Guest"| Local["Browser localStorage<br/>(100% Offline / Device-Only)"]
+
+    Gatekeeper -->|"Verified Student"| DriveAPI["Google Drive v3 REST API<br/>(drive.appdata scope)"]
+    Gatekeeper -->|"Non-BRACU Email"| Denied["Access Blocked<br/>(Token Revoked)"]
+
+    DriveAPI <-->|"Encrypted HTTPS JSON"| AppData["Personal Google Drive<br/>(Hidden AppData Folder)"]
 ```
 
-### G-Suite Domain Gatekeeper (`@g.bracu.ac.bd`)
-- Integrated using Google OAuth 2.0 with strict domain restriction:
-  ```typescript
-  // Enforced domain restriction in authorization request
-  google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.appdata',
-    hd: 'g.bracu.ac.bd', // Strictly restricts authentication to BRACU G-Suite
-    callback: handleOAuthResponse,
-  });
-  ```
-- Any attempt to authenticate with a personal `@gmail.com` or unauthorized email domain is immediately intercepted and blocked by the Auth Gatekeeper with an explicit denial alert.
-
-### Private Google Drive `appDataFolder` Sync
-- Authenticated students store their entire academic plan inside their personal Google Drive's hidden `appDataFolder` (`https://www.googleapis.com/auth/drive.appdata`).
-- **Zero Server Footprint**: Route136 communicates directly from the client browser to Google's official Drive v3 REST API.
-- **Auto-Sync & Manual Backup**: Progress auto-syncs seamlessly, with manual **"Backup to Cloud"** and **"Restore from Cloud"** options available anytime.
-
-### Guest Session (Local Storage Only)
-- Students who prefer not to sign in can click **"Continue as Guest (Local Storage Only)"** to immediately access the complete tracker.
-- Guest data is preserved in browser `localStorage`.
-- A subtle header badge indicates **Guest Mode** with an instant one-click option to upgrade to Google Drive Cloud Sync whenever ready.
+- **Domain Gatekeeper (`@g.bracu.ac.bd`)**: Google OAuth 2.0 verifies BRACU G-Suite student accounts and revokes unauthorized tokens client-side.
+- **Isolated `appDataFolder` Scope**: Uses `https://www.googleapis.com/auth/drive.appdata` only—Route136 cannot view or modify your personal Drive files.
+- **Guest Mode**: Works offline out of the box with `.json` export/restore backups.
 
 ---
 
-## 🛠 Local Development & Setup
+## `[ GETTING STARTED ]`
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18.18 or higher recommended)
-- `npm`, `pnpm`, or `yarn`
+```bash
+# 1. Clone the repository
+git clone https://github.com/fakekhanabdullah/Route136-CSE-Course-Tracker.git
+cd "Route136 CSE Course Tracker"
 
-### Installation
+# 2. Install dependencies
+npm install
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/fakekhanabdullah/Route136-CSE-Course-Tracker.git
-   cd Route136-CSE-Course-Tracker
-   ```
+# 3. (Optional) Configure Google OAuth Client ID for local Drive sync
+echo "NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com" > .env.local
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+# 4. Run development server
+npm run dev
 
-3. **Configure Google OAuth (Optional for local testing)**:
-   By default, the app is preconfigured with the official client ID for `@g.bracu.ac.bd` domain authentication. You can also configure a custom OAuth client ID via `.env.local` (`NEXT_PUBLIC_GOOGLE_CLIENT_ID`) or by modifying `src/lib/googleDriveSync.ts`.
-
-4. **Run the development server with Turbopack**:
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) with your browser.
-
-5. **Build for production**:
-   ```bash
-   npm run build
-   ```
-
----
-
-## 🤖 AI-Assisted Development (Antigravity)
-
-Route136 was architected and refined using **Google Antigravity (AGY)** pair-programming standards. Development guardrails codified in `AGENTS.md` enforce strict Next.js App Router conventions, zero-database privacy boundaries, and TypeScript type integrity across all changes.
-
-Key custom skills and tools leveraged during development include:
-- **`agy-customizations` & `antigravity-guide`**: Managed workspace rules, context-efficient skill loading, and agent pair-programming standards.
-- **`ui-ux-optimizer`**: Streamlined responsive mobile scaling, horizontal slider mechanics for semester performance bars, and dark cyber-blue theme aesthetics.
-- **`readme-changelog-maintainer`**: Kept documentation, prerequisite datasets, and verification guidelines synchronized with codebase iterations.
-
-This approach enabled rapid, testable feature delivery—such as prerequisite graph solvers, live credit capacity safeguards, and Google Drive cloud synchronization—without manual overhead.
-
----
-
-## 📂 Project Structure
-
+# 5. Build for production
+npm run build && npm start
 ```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## `[ PROJECT STRUCTURE ]`
+
+```text
 Route136-CSE-Course-Tracker/
-├── .agents/                    # Workspace agent configurations & skills
-├── AGENTS.md                   # Workspace rules & Next.js conventions
-├── PRIVACY_POLICY.md           # Standalone Privacy Policy document
-├── TERMS_OF_SERVICE.md         # Standalone Terms of Service document
-├── public/                     # Static assets (favicons, icons, manifest)
+├── public/
+│   ├── icon.svg                           # White browser tab favicon (32x32 SVG)
+│   ├── logo-white.svg                     # Route136 white logo (400x400 SVG)
+│   ├── logo-white.png                     # Route136 white logo (400x400 PNG)
+│   ├── manifest.json                      # PWA manifest metadata
+│   └── sw.js                              # Service worker for offline caching
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx          # Root Next.js layout, fonts, and Google site verification
-│   │   ├── page.tsx            # Main application: Landing hero, Auth Gatekeeper, Degree Dashboard
-│   │   ├── privacy/page.tsx    # Dedicated Privacy Policy route & Google Limited Use disclosure
-│   │   └── terms/page.tsx      # Dedicated Terms of Service route & academic disclaimers
-│   ├── components/             # Reusable UI components (Graph, Modals, Nav, SpeedDial)
+│   │   ├── courses-data.ts                # 136-credit BRACU CSE course catalog & prerequisites
+│   │   ├── globals.css                    # Tailwind CSS v4 tokens, Vercel shadows & scrollbars
+│   │   ├── icon.svg                       # Next.js App Router white favicon
+│   │   ├── layout.tsx                     # Root layout, Geist fonts, theme hydration & metadata
+│   │   ├── page.tsx                       # Landing page, 3-step setup wizard, workspace & modals
+│   │   ├── privacy/page.tsx               # Privacy Policy (dark/light persisted)
+│   │   └── terms/page.tsx                 # Terms of Service (dark/light persisted)
+│   ├── components/
+│   │   ├── AddCoursesModal.tsx            # Multi-semester course builder with in-batch retakes
+│   │   ├── AddSemesterModal.tsx           # Focused semester editor modal
+│   │   ├── CgpaSemesterGraph.tsx          # Semester performance SGPA chart + editable goal
+│   │   ├── MobileBottomNav.tsx            # Responsive mobile navigation dock
+│   │   ├── PrereqChainsModal.tsx          # Interactive CSE/MNS/BIL prerequisite chain viewer
+│   │   ├── QuickGradeCarouselModal.tsx    # Term-by-term carousel for rapid grade entry
+│   │   ├── SpeedDialMenu.tsx              # Mobile quick-action sheet
+│   │   └── ThemeToggleButton.tsx          # Shared Dark/Light theme switcher
 │   └── lib/
-│       ├── googleDriveSync.ts  # Google OAuth 2.0 & Google Drive v3 REST API persistence
-│       └── utils.ts            # Class merging and utility helpers
-├── package.json                # Project dependencies and script declarations
-├── next.config.ts              # Next.js configuration
-├── tsconfig.json               # TypeScript strict configuration
-└── README.md                   # Route136 Comprehensive Documentation
+│       └── googleDriveSync.ts             # Google OAuth 2.0 gatekeeper & Drive v3 AppData client
+├── package.json                           # Next.js 16.4.6, React 19.2.4, Tailwind CSS v4
+└── tsconfig.json                          # Strict TypeScript configuration
 ```
 
 ---
 
-## 📜 Disclaimer & License
+## `[ DISCLAIMER & LICENSE ]`
 
-- **Disclaimer**: Route136 is an independent, open-source tool developed by [Khan Abdullah](https://github.com/fakekhanabdullah) and is **not officially affiliated with or endorsed by BRAC University**. All course codes, credits, and syllabus pathways are derived from public BRACU CSE departmental guidelines.
-- **License**: Released under the [MIT License](LICENSE).
+- **Academic Disclaimer**: **Route136** is an independent, student-built open-source utility created by [Khan Abdullah](https://github.com/fakekhanabdullah) and is **not officially affiliated with, endorsed by, or operated by BRAC University**. All official academic records, prerequisite clearances, and graduation audits are governed exclusively by BRAC University's Office of the Registrar, USIS/Connect portals, and departmental advisors.
+- **Curriculum Attribution**: Recommended 136-credit degree distribution guidelines incorporate reference materials compiled by **Badhon Nandi** (FYAT Mentor, OAA, BRAC University).
+- **License**: Distributed under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
-  <sub>Crafted with precision for the BRACU CSE Community • Powered by Next.js 16 & Google Antigravity</sub>
+  <sub>Built for the BRACU CSE Community by <a href="https://github.com/fakekhanabdullah">Khan Abdullah</a> • Powered by Next.js 16 &amp; Tailwind CSS v4</sub>
 </div>

@@ -19,6 +19,7 @@ interface CgpaSemesterGraphProps {
     standing: string;
   };
   targetCgpa: string;
+  onTargetCgpaChange?: (newTarget: string) => void;
   onOpenQuickGrades?: () => void;
   onSelectSemester?: (semId: string) => void;
 }
@@ -28,6 +29,7 @@ export default function CgpaSemesterGraph({
   semesterStats,
   cumulativeStats,
   targetCgpa,
+  onTargetCgpaChange,
   onOpenQuickGrades,
   onSelectSemester,
 }: CgpaSemesterGraphProps) {
@@ -100,25 +102,27 @@ export default function CgpaSemesterGraph({
             <span className="text-[10px] text-[#888888] font-mono">/ 4.00</span>
           </div>
 
-          {/* Target Delta */}
-          <div className="h-8 bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-3 rounded-full flex items-center gap-1.5 shadow-vercel-subtle">
-            <Target className="h-3 w-3 text-amber-500" />
-            <span className="text-[11px] text-[#888888]">
-              Goal: <strong className="font-mono text-[#171717] dark:text-[#ededed] font-medium">{targetNum.toFixed(2)}</strong>
-            </span>
+          {/* Editable Target Goal Pill */}
+          <div className="h-8 bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] focus-within:border-amber-500/60 px-3 rounded-full flex items-center gap-1.5 shadow-vercel-subtle transition-colors">
+            <Target className="h-3 w-3 text-amber-500 shrink-0" />
+            <span className="text-[11px] text-[#888888]">Goal:</span>
+            {onTargetCgpaChange ? (
+              <input
+                type="number"
+                step="0.01"
+                min="1.5"
+                max="4.0"
+                value={targetCgpa}
+                onChange={(e) => onTargetCgpaChange(e.target.value)}
+                title="Click to edit Target CGPA Goal"
+                className="w-11 text-xs font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-transparent focus:outline-none text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            ) : (
+              <strong className="font-mono text-xs text-[#171717] dark:text-[#ededed] font-medium">
+                {targetNum.toFixed(2)}
+              </strong>
+            )}
           </div>
-
-          {/* Quick Grade action button */}
-          {onOpenQuickGrades && (
-            <button
-              type="button"
-              onClick={onOpenQuickGrades}
-              className="h-8 px-3.5 bg-[#171717] dark:bg-[#ededed] text-white dark:text-black hover:bg-black/90 dark:hover:bg-white font-medium text-xs rounded-full shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer ml-auto sm:ml-0"
-            >
-              <Zap className="h-3 w-3 fill-current" />
-              <span>Quick Grades</span>
-            </button>
-          )}
 
           {/* Scroll navigation arrows for horizontal slider */}
           <div className="h-8 bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-1 rounded-full flex items-center gap-0.5 shadow-vercel-subtle">
@@ -178,16 +182,12 @@ export default function CgpaSemesterGraph({
               <div className="absolute inset-x-0 top-1/2 border-b border-dashed border-red-500/30" />
               <div className="absolute inset-x-0 bottom-0 border-b border-[#ebebeb] dark:border-[#262626]" />
 
-              {/* Target CGPA Reference Line */}
+              {/* Target CGPA Reference Line (Line only — value shown in bottom legend) */}
               {targetNum > 0 && targetNum <= 4.0 && (
                 <div
                   style={{ top: `${targetYPct}%` }}
-                  className="absolute inset-x-0 border-b border-dashed border-amber-500/70 z-20 pointer-events-none transition-all duration-300 flex items-center justify-end"
-                >
-                  <span className="font-mono text-[9px] sm:text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-white/95 dark:bg-[#0c0c0c]/95 px-1.5 py-0.5 rounded border border-amber-500/30 -translate-y-1/2 mr-1.5 shadow-vercel-subtle">
-                    Target {targetNum.toFixed(2)}
-                  </span>
-                </div>
+                  className="absolute inset-x-0 border-b border-dashed border-amber-500/70 z-20 pointer-events-none transition-all duration-300"
+                />
               )}
             </div>
 
@@ -302,7 +302,9 @@ export default function CgpaSemesterGraph({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-3 border-t border-dashed border-amber-500" />
-              <span className="text-amber-600 dark:text-amber-400">Target Goal</span>
+              <span className="text-amber-600 dark:text-amber-400">
+                Target Goal (<strong className="font-mono">{targetNum.toFixed(2)}</strong>)
+              </span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-3 border-t border-dashed border-red-500" />

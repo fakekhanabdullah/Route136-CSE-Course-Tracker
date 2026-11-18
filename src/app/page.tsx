@@ -59,7 +59,8 @@ import {
   ExternalLink,
   Menu,
   Sun,
-  Moon
+  Moon,
+  GitBranch
 } from "lucide-react";
 import { COURSES, PREREQUISITES, Course, PrereqRule } from "./courses-data";
 import {
@@ -70,6 +71,7 @@ import {
   DEFAULT_GSI_CLIENT_ID,
   STORAGE_KEYS,
   isAuthorizedBRACUStudent,
+  loadGoogleGsiScript,
   requestGoogleAccessToken,
   fetchGoogleUserProfile,
   revokeGoogleToken,
@@ -88,6 +90,7 @@ import AddCoursesModal from "@/components/AddCoursesModal";
 import QuickGradeCarouselModal from "@/components/QuickGradeCarouselModal";
 import SpeedDialMenu from "@/components/SpeedDialMenu";
 import MobileBottomNav, { MobileTab } from "@/components/MobileBottomNav";
+import PrereqChainsModal from "@/components/PrereqChainsModal";
 
 
 // Prerequisite Helper functions
@@ -174,10 +177,11 @@ interface OnboardingData {
   remedialMat091Checked: boolean;
   remedialMat092Checked: boolean;
   creditOption: 'opt1' | 'opt2' | null;
-  rsTerm: '3rd Semester' | '4th Semester' | '5th Semester';
+  rsTerm: string; // e.g. '3rd Semester'..'12th Semester' or 'not_sure'
   engStatusPriorToRS: 'caseA' | 'caseB' | 'caseC' | 'caseD' | null;
   startingTerm: 'Spring' | 'Summer' | 'Fall';
   startingYear: number;
+  currentSemesterNumber?: number;
 }
 
 const GRADING_SCALE: Record<string, number> = {
@@ -256,6 +260,8 @@ export default function Home() {
         }
       }
     } catch {}
+    // Preload Google Identity Services script so sign-in popup opens synchronously on click
+    loadGoogleGsiScript().catch(() => {});
   }, []);
 
   const toggleTheme = () => {
@@ -273,8 +279,8 @@ export default function Home() {
     });
   };
 
-  // App settings/modes
-  const [mode, setMode] = useState<'tracker' | 'gpa'>('tracker');
+  // App settings/modes (Unified Always-On Course + CGPA mode)
+  const [mode, setMode] = useState<'tracker' | 'gpa'>('gpa');
   const [isOnboarded, setIsOnboarded] = useState<boolean>(false);
   
   // Onboarding Wizard state
@@ -289,7 +295,8 @@ export default function Home() {
     rsTerm: "3rd Semester",
     engStatusPriorToRS: null,
     startingTerm: "Spring",
-    startingYear: 2025
+    startingYear: 2025,
+    currentSemesterNumber: 1
   });
 
   // Semesters state
@@ -334,6 +341,9 @@ export default function Home() {
   const [focusedSemesterForModal, setFocusedSemesterForModal] = useState<Semester | null>(null);
   const [isAddCoursesModalOpen, setIsAddCoursesModalOpen] = useState<boolean>(false);
   const [addCoursesPreselected, setAddCoursesPreselected] = useState<string[]>([]);
+  const [addCoursesTargetSemesterId, setAddCoursesTargetSemesterId] = useState<string | null>(null);
+  const [activeCourseMenuKey, setActiveCourseMenuKey] = useState<string | null>(null);
+  const [activeSemesterMenuId, setActiveSemesterMenuId] = useState<string | null>(null);
   const [isQuickGradesModalOpen, setIsQuickGradesModalOpen] = useState<boolean>(false);
   const [quickGradesInitialSemIdx, setQuickGradesInitialSemIdx] = useState<number>(0);
   const [isMobileSpeedDialOpen, setIsMobileSpeedDialOpen] = useState<boolean>(false);
@@ -364,11 +374,12 @@ export default function Home() {
   }, [semesters]);
 
   const [showRoiModal, setShowRoiModal] = useState<boolean>(false);
+  const [showPrereqChainsModal, setShowPrereqChainsModal] = useState<boolean>(false);
   const [roiThresholdGrade, setRoiThresholdGrade] = useState<string>("B-");
   const [selectedRoiCourses, setSelectedRoiCourses] = useState<Record<string, boolean>>({});
   const [roiTargetGrades, setRoiTargetGrades] = useState<Record<string, string>>({});
   const [showGradingSystemModal, setShowGradingSystemModal] = useState<boolean>(false);
-  const [isCapstoneCollapsed, setIsCapstoneCollapsed] = useState<boolean>(false);
+  const [isCapstoneCollapsed, setIsCapstoneCollapsed] = useState<boolean>(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState<boolean>(false);
   const [showGradeSheetModal, setShowGradeSheetModal] = useState<boolean>(false);
   const [snapshotScale, setSnapshotScale] = useState<number>(1);
@@ -607,7 +618,7 @@ export default function Home() {
       const savedState = localStorage.getItem("bracu_course_tracker_state");
       if (savedState) {
         const parsed = JSON.parse(savedState);
-        if (parsed.mode) setMode(parsed.mode);
+        setMode('gpa');
         if (parsed.isOnboarded !== undefined) setIsOnboarded(parsed.isOnboarded);
         if (parsed.semesters && Array.isArray(parsed.semesters)) {
           const sanitized = parsed.semesters.map((s: Semester) => ({
@@ -620,7 +631,12 @@ export default function Home() {
         if (parsed.thesisSteps) setThesisSteps(parsed.thesisSteps);
         if (parsed.projectCompleted !== undefined) setProjectCompleted(parsed.projectCompleted);
         if (parsed.internshipCompleted !== undefined) setInternshipCompleted(parsed.internshipCompleted);
-        if (parsed.onboardingData) setOnboardingData(parsed.onboardingData);
+        if (parsed.onboardingData) {
+          setOnboardingData({
+            currentSemesterNumber: 1,
+            ...parsed.onboardingData
+          });
+        }
       }
 
       // Hydrate Cloud Sync session & Guest Mode
@@ -712,83 +728,6 @@ export default function Home() {
     return () => clearInterval(checkInterval);
   }, [isMounted, cloudUser]);
 
-  // Trigger Recommended Curriculum Modal if user completes onboarding and has 0 courses
-  useEffect(() => {
-    if (!isMounted || !isOnboarded || semesters.length === 0) return;
-    
-    // Count total courses currently added across all semesters
-    const totalCourses = semesters.reduce((acc, sem) => acc + (sem.courses || []).length, 0);
-    
-    if (totalCourses === 0) {
-      const autoShown = localStorage.getItem("flow136_roadmap_auto_shown");
-      if (!autoShown) {
-        setShowRoadmapModal(true);
-        localStorage.setItem("flow136_roadmap_auto_shown", "true");
-      }
-    }
-  }, [isMounted, isOnboarded, semesters]);
-
-  // Synchronize RS card 4th course dynamically based on preceding ENG102 completion
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    const rsIdx = semesters.findIndex(s => s.isRS);
-    if (rsIdx === -1) return;
-
-    // Check if ENG102 is completed in any semester BEFORE rsIdx
-    let eng102CompletedBefore = false;
-    for (let i = 0; i < rsIdx; i++) {
-      const found = semesters[i].courses.find(c => c.code === "ENG102");
-      if (found) {
-        const isComp = mode === 'tracker'
-          ? found.isCompleted
-          : (found.isCompleted && found.grade !== "" && found.grade !== "F");
-        if (isComp) {
-          eng102CompletedBefore = true;
-          break;
-        }
-      }
-    }
-
-    const rsSem = semesters[rsIdx];
-    const hasENG102 = rsSem.courses.some(c => c.code === "ENG102");
-    const hasBU201 = rsSem.courses.some(c => c.code === "BU201");
-
-    let updatedCourses = [...rsSem.courses];
-    let changed = false;
-
-    if (eng102CompletedBefore) {
-      // Should have BU201 instead of ENG102
-      if (hasENG102) {
-        updatedCourses = updatedCourses.map(c => c.code === "ENG102" ? { ...c, code: "BU201" } : c);
-        changed = true;
-      } else if (!hasBU201) {
-        updatedCourses.push({ code: "BU201", grade: "", isCompleted: false });
-        changed = true;
-      }
-    } else {
-      // Should have ENG102 instead of BU201
-      if (hasBU201) {
-        updatedCourses = updatedCourses.map(c => c.code === "BU201" ? { ...c, code: "ENG102" } : c);
-        changed = true;
-      } else if (!hasENG102) {
-        updatedCourses.push({ code: "ENG102", grade: "", isCompleted: false });
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      const newSemesters = semesters.map((sem, idx) => {
-        if (idx === rsIdx) {
-          return { ...sem, courses: updatedCourses };
-        }
-        return sem;
-      });
-      setSemesters(newSemesters);
-      saveStateToLocalStorage(mode, isOnboarded, newSemesters, thesisTrack, thesisSteps, projectCompleted, internshipCompleted, onboardingData);
-    }
-  }, [semesters, mode, isMounted]);
-
   // Sync state to LocalStorage
   const saveStateToLocalStorage = (
     currentMode: 'tracker' | 'gpa',
@@ -835,7 +774,7 @@ export default function Home() {
   };
 
   const handleModeToggle = () => {
-    const nextMode = mode === 'tracker' ? 'gpa' : 'tracker';
+    const nextMode = 'gpa';
     setMode(nextMode);
     saveStateToLocalStorage(
       nextMode,
@@ -849,9 +788,8 @@ export default function Home() {
     );
   };
 
-  // Onboarding plan generation
-  const generateInitialPlan = () => {
-    const initialSemesters: Semester[] = [];
+  // Build or refresh the 12 default semesters for Step 3 of the Setup Wizard
+  const buildTwelveDefaultSemesters = (existingSems?: Semester[]): Semester[] => {
     const semNames = [
       "1st Semester",
       "2nd Semester",
@@ -862,147 +800,96 @@ export default function Home() {
       "7th Semester",
       "8th Semester",
       "9th Semester",
-      "10th Semester"
+      "10th Semester",
+      "11th Semester",
+      "12th Semester"
     ];
+    let rsIndex = -1;
+    if (onboardingData.rsTerm && onboardingData.rsTerm !== "not_sure") {
+      const parsed = parseInt(onboardingData.rsTerm, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 12) {
+        rsIndex = parsed - 1;
+      }
+    }
+    const currentSemNum = onboardingData.currentSemesterNumber || 1;
 
-    const rsIndex = onboardingData.rsTerm === "3rd Semester" ? 2 : (onboardingData.rsTerm === "4th Semester" ? 3 : 4);
-
-    // Create 10 semesters
-    let semCounter = 1;
-    for (let i = 0; i < 10; i++) {
+    const draftSemesters: Semester[] = [];
+    for (let i = 0; i < 12; i++) {
       const isRS = i === rsIndex;
       const semName = isRS ? "Residential Semester (RS)" : semNames[i];
-      initialSemesters.push({
+      const existing = existingSems && existingSems[i];
+      draftSemesters.push({
         id: `sem-${i + 1}`,
         name: semName,
-        courses: [],
+        courses: existing ? [...existing.courses] : [],
         isRS
       });
     }
 
+    // Track all courses already present across draftSemesters so we never duplicate
     const addedCourses = new Set<string>();
+    draftSemesters.forEach(s => s.courses.forEach(c => addedCourses.add(c.code)));
 
-    // 1st Semester Courses (index 0)
+    const addUniqueToSem = (semIdx: number, courseObj: SelectedCourse) => {
+      if (addedCourses.has(courseObj.code)) return;
+      draftSemesters[semIdx].courses.push(courseObj);
+      addedCourses.add(courseObj.code);
+    };
+
+    // 1st Semester baseline from Step 2 (Pathway)
     if (onboardingData.pathway === 'foundation') {
       if (onboardingData.remedialEng091Checked) {
-        initialSemesters[0].courses.push({ code: "ENG091", grade: "A", isCompleted: true });
-        addedCourses.add("ENG091");
+        addUniqueToSem(0, { code: "ENG091", grade: "A", isCompleted: true });
       }
       if (onboardingData.remedialMat091Checked) {
-        initialSemesters[0].courses.push({ code: "MAT091", grade: "A", isCompleted: true });
-        addedCourses.add("MAT091");
+        addUniqueToSem(0, { code: "MAT091", grade: "A", isCompleted: true });
       }
       if (onboardingData.remedialMat092Checked) {
-        initialSemesters[0].courses.push({ code: "MAT092", grade: "A", isCompleted: true });
-        addedCourses.add("MAT092");
+        addUniqueToSem(0, { code: "MAT092", grade: "A", isCompleted: true });
       }
     } else if (onboardingData.pathway === 'credit') {
       if (onboardingData.creditOption === 'opt1') {
-        initialSemesters[0].courses.push({ code: "ENG101", grade: "", isCompleted: false });
-        addedCourses.add("ENG101");
+        addUniqueToSem(0, { code: "ENG101", grade: "", isCompleted: currentSemNum > 1 });
       } else if (onboardingData.creditOption === 'opt2') {
-        initialSemesters[0].courses.push({ code: "ENG102", grade: "", isCompleted: false });
-        addedCourses.add("ENG102");
+        addUniqueToSem(0, { code: "ENG102", grade: "", isCompleted: currentSemNum > 1 });
       }
     }
 
-    // Pre-populate preceding English courses if they passed them
-    if (onboardingData.engStatusPriorToRS === 'caseA') {
-      if (!addedCourses.has("ENG101")) {
-        const targetSemIdx = onboardingData.pathway === 'foundation' ? 1 : 0;
-        initialSemesters[targetSemIdx].courses.push({ code: "ENG101", grade: "", isCompleted: false });
-        addedCourses.add("ENG101");
-      }
-    } else if (onboardingData.engStatusPriorToRS === 'caseB') {
-      if (!addedCourses.has("ENG101")) {
-        initialSemesters[0].courses.push({ code: "ENG101", grade: "", isCompleted: false });
-        addedCourses.add("ENG101");
-      }
-      if (!addedCourses.has("ENG102")) {
-        const targetSemIdx = onboardingData.pathway === 'foundation' ? 2 : 1;
-        initialSemesters[targetSemIdx].courses.push({ code: "ENG102", grade: "", isCompleted: false });
-        addedCourses.add("ENG102");
-      }
-    } else if (onboardingData.engStatusPriorToRS === 'caseC') {
-      if (!addedCourses.has("ENG101")) {
-        initialSemesters[0].courses.push({ code: "ENG101", grade: "", isCompleted: false });
-        addedCourses.add("ENG101");
-      }
-    } else if (onboardingData.engStatusPriorToRS === 'caseD') {
-      if (!addedCourses.has("ENG102")) {
-        initialSemesters[0].courses.push({ code: "ENG102", grade: "", isCompleted: false });
-        addedCourses.add("ENG102");
-      }
+    // Only pre-populate the 3 mandatory RS courses (EMB101, HUM103, BNG103) if user chose an RS semester and has reached or passed it.
+    // The 4th RS course (ENG102 vs. BU201) is chosen by the user directly on the RS card in Step 3.
+    if (rsIndex >= 0 && currentSemNum >= rsIndex + 1) {
+      const rsCompleted = currentSemNum > rsIndex + 1;
+      addUniqueToSem(rsIndex, { code: "EMB101", grade: "", isCompleted: rsCompleted });
+      addUniqueToSem(rsIndex, { code: "HUM103", grade: "", isCompleted: rsCompleted });
+      addUniqueToSem(rsIndex, { code: "BNG103", grade: "", isCompleted: rsCompleted });
     }
 
-    // RS Semester card populating (index rsIndex)
-    // Part 1: Three universal mandatory core courses (EMB101, HUM103, BNG103)
-    initialSemesters[rsIndex].courses.push({ code: "EMB101", grade: "", isCompleted: false });
-    addedCourses.add("EMB101");
-    initialSemesters[rsIndex].courses.push({ code: "HUM103", grade: "", isCompleted: false });
-    addedCourses.add("HUM103");
-    initialSemesters[rsIndex].courses.push({ code: "BNG103", grade: "", isCompleted: false });
-    addedCourses.add("BNG103");
+    return draftSemesters;
+  };
 
-    // Part 2: English / BU201 Conditional Rule (dynamic placement)
-    const eng102Done = addedCourses.has("ENG102");
-    const fourthCourse = eng102Done ? "BU201" : "ENG102";
-    initialSemesters[rsIndex].courses.push({ code: fourthCourse, grade: "", isCompleted: false });
-    addedCourses.add(fourthCourse);
+  // Transition from Step 2 to Step 3: prepare 12 semesters without auto-dumping courses
+  const handleProceedToWizardStep3 = () => {
+    const initialized = buildTwelveDefaultSemesters(semesters.length === 12 ? semesters : undefined);
+    setSemesters(initialized);
+    setWizardStep(3);
+  };
 
-    // Distribute remaining mandatory courses
-    const coreDistributionList = [
-      "MAT110", "CSE110", 
-      "MAT120", "CSE111", "PHY111",
-      "CSE220", "CSE230", "PHY112",
-      "CSE221", "CSE250", "STA201",
-      "BNG103", "HUM103", "CSE251",
-      "CSE260", "MAT215", "CSE320",
-      "CSE321", "MAT216", "CSE330",
-      "CSE331", "CSE340", "CSE341",
-      "CSE350", "CSE360", "CSE370",
-      "CSE420", "CSE421", "CSE422",
-      "CSE423", "CSE460", "CSE461",
-      "CSE470", "CSE471"
-    ];
+  // Finalize Onboarding Plan (12 Semesters, preserving user-added courses and leaving future semesters clean)
+  const generateInitialPlan = () => {
+    const finalSemesters = semesters.length === 12
+      ? semesters.map(s => ({ ...s, courses: dedupeSemesterCourses(s.courses || []) }))
+      : buildTwelveDefaultSemesters();
 
-    coreDistributionList.forEach(courseCode => {
-      if (addedCourses.has(courseCode)) return;
-
-      let placed = false;
-      for (let sIdx = 0; sIdx < 10; sIdx++) {
-        if (sIdx === rsIndex) continue;
-
-        if (initialSemesters[sIdx].courses.length < 4) {
-          initialSemesters[sIdx].courses.push({ code: courseCode, grade: "", isCompleted: false });
-          addedCourses.add(courseCode);
-          placed = true;
-          break;
-        }
-      }
-
-      if (!placed) {
-        const fallbackIdx = 9;
-        initialSemesters[fallbackIdx].courses.push({ code: courseCode, grade: "", isCompleted: false });
-        addedCourses.add(courseCode);
-      }
-    });
-
-    if (!addedCourses.has("CSE400")) {
-      const cse400Idx = 8;
-      initialSemesters[cse400Idx].courses.push({ code: "CSE400", grade: "", isCompleted: false });
-      addedCourses.add("CSE400");
-    }
-
-    setSemesters(initialSemesters);
+    setSemesters(finalSemesters);
+    setMode('gpa');
     setIsOnboarded(true);
     setWizardStep(1);
 
     // Sync
     saveStateToLocalStorage(
-      mode,
+      'gpa',
       true,
-      initialSemesters,
+      finalSemesters,
       thesisTrack,
       thesisSteps,
       projectCompleted,
@@ -2086,7 +1973,7 @@ export default function Home() {
     updateSemesters([...semesters, newSem]);
   };
 
-  // Floating Action: Add Semester and open focused modal with live course search
+  // Floating Action: Add Semester and open unified AddCoursesModal targeted to the new semester
   const handleTriggerAddSemester = () => {
     const nextIdx = semesters.length + 1;
     const newSem: Semester = {
@@ -2099,8 +1986,9 @@ export default function Home() {
     };
     const nextSemesters = [...semesters, newSem];
     updateSemesters(nextSemesters);
-    setFocusedSemesterForModal(newSem);
-    setIsAddSemesterModalOpen(true);
+    setAddCoursesTargetSemesterId(newSem.id);
+    setAddCoursesPreselected([]);
+    setIsAddCoursesModalOpen(true);
   };
 
   // Floating Action: Commit Add Courses with duplicate move/retake resolution
@@ -2586,6 +2474,10 @@ export default function Home() {
       }
 
       const token = await requestGoogleAccessToken(activeClientId);
+      if (!token) {
+        setCloudSyncStatus('unauthenticated');
+        return;
+      }
       localStorage.setItem(STORAGE_KEYS.TOKEN, token);
 
       // Fetch user profile and strictly enforce Auth Gatekeeper
@@ -2617,11 +2509,10 @@ export default function Home() {
       setCloudSyncStatus('synced');
       showCloudToast(`Welcome, ${user.name}! Cloud sync active.`);
     } catch (err: any) {
-      console.error("Sign-in failed:", err);
-      if ((err as any).isGatekeeperError) {
+      if ((err as any)?.isGatekeeperError) {
         setGatekeeperError(err.message);
       } else {
-        showCloudToast(err.message || "Failed to sign in with Google.");
+        showCloudToast(err?.message || "Failed to sign in with Google.");
       }
       setCloudSyncStatus('unauthenticated');
     } finally {
@@ -3728,31 +3619,34 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-              {/* Bento Card 1: Prerequisite Validator (3 cols) */}
+              {/* Bento Card 1: Pre-req Chain Sequence Viewer (3 cols) */}
               <div className="md:col-span-3 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 sm:p-6 shadow-vercel-card flex flex-col justify-between gap-4 hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed]">
-                      <Layers className="h-4 w-4" />
+                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-emerald-500">
+                      <GitBranch className="h-4 w-4" />
                     </div>
                     <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626]">
-                      DEPENDENCY GRAPH
+                      PRE-REQ CHAIN
                     </span>
                   </div>
                   <h3 className="text-base font-semibold text-[#171717] dark:text-[#ededed] mb-1.5">
-                    Hard &amp; Soft Prerequisite Validation
+                    Interactive Prerequisite Chains
                   </h3>
                   <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                    Automatically flags missing hard prerequisites and advisory soft prerequisites across your timeline before registration week.
+                    Visualize every CSE, MNS &amp; BIL prerequisite sequence in one flowchart, track how many courses remain in each chain, and inspect what unlocks next.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
-                  <span className="px-2 py-1 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE110 ✓</span>
-                  <span className="text-[#888888]">→</span>
-                  <span className="px-2 py-1 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE111 ✓</span>
-                  <span className="text-[#888888]">→</span>
-                  <span className="px-2 py-1 rounded bg-[#0070f3]/10 border border-[#0070f3]/30 text-[#0070f3] font-medium">CSE220 Unlocked</span>
+                <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE110 ✓</span>
+                    <span className="text-[#888888]">→</span>
+                    <span className="px-2 py-0.5 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE220 ✓</span>
+                    <span className="text-[#888888]">→</span>
+                    <span className="px-2 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/30 text-[#0070f3] font-medium">CSE221 Ready</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">4 Left in Chain</span>
                 </div>
               </div>
 
@@ -3794,16 +3688,16 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Bento Card 4: List & Kanban Dual Views (2 cols) */}
+              {/* Bento Card 4: Semester Performance Charts (2 cols) */}
               <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
-                  <Columns className="h-4 w-4" />
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] mb-3">
+                  <TrendingUp className="h-4 w-4" />
                 </div>
                 <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
-                  List &amp; Kanban Board Views
+                  Semester Performance Charts
                 </h3>
                 <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                  Switch seamlessly between a detailed vertical semester feed and a horizontal drag-and-scroll Kanban board across desktop and mobile.
+                  Track term-by-term SGPA bars against an editable graduation target line, spot your peak semester, and click any bar for instant grade entry.
                 </p>
               </div>
 
@@ -3879,117 +3773,213 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full bg-[#fafafa] dark:bg-[#000000] text-[#171717] dark:text-[#ededed] font-sans antialiased flex flex-col lg:flex-row relative selection:bg-[#171717] selection:text-white dark:selection:bg-[#ededed] dark:selection:text-black">
-      {/* 1. Left Vertical Dock (Desktop >= 1024px) */}
-      <aside className="hidden lg:flex w-16 h-screen sticky top-0 bg-white dark:bg-[#000000] border-r border-[#ebebeb] dark:border-[#262626] flex-col items-center justify-between py-5 shrink-0 z-40 transition-colors">
-        {/* Top: Logo & Nav Jump Icons */}
-        <div className="flex flex-col items-center gap-5 w-full">
-          {/* Logo */}
-          <div 
+      {/* 1. Left Vertical Sidebar (Desktop >= 1024px) */}
+      <aside className="hidden lg:flex w-56 h-screen sticky top-0 bg-white dark:bg-[#080808] border-r border-[#ebebeb] dark:border-[#1f1f1f] flex-col justify-between p-4 shrink-0 z-40 transition-colors">
+        {/* Top: Brand Header & Labeled Navigation Sections */}
+        <div className="flex flex-col gap-5 w-full">
+          {/* Logo & Brand */}
+          <div
             onClick={() => setShowDashboard(false)}
-            className="h-9 w-9 rounded-lg bg-[#171717] dark:bg-white text-white dark:text-black flex items-center justify-center cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-vercel-subtle"
+            className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#f5f5f5] dark:hover:bg-[#121212] cursor-pointer transition-all group"
             title="Route136 - Back to Landing Page"
           >
-            <svg className="h-5 w-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-            </svg>
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-[#171717] dark:bg-white text-white dark:text-black flex items-center justify-center shadow-vercel-subtle shrink-0">
+                <svg className="h-4 w-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[#171717] dark:text-[#ededed] tracking-tight leading-none">
+                  Route136
+                </p>
+                <p className="text-[10px] font-mono text-[#888888] mt-1 leading-none">
+                  BRACU CSE • 136 Cr
+                </p>
+              </div>
+            </div>
+            <ArrowUpRight className="h-3.5 w-3.5 text-[#888888] opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
 
-          <div className="w-6 h-px bg-[#ebebeb] dark:bg-[#262626]" />
-
-          {/* Navigation Jump Icons */}
-          <nav className="flex flex-col items-center gap-2 w-full">
-            {/* Planner Icon */}
+          {/* Primary Action Button in Sidebar */}
+          {isOnboarded && (
             <button
               type="button"
               onClick={() => {
-                const el = document.getElementById("semester-planner-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                setAddCoursesTargetSemesterId(null);
+                setAddCoursesPreselected([]);
+                setIsAddCoursesModalOpen(true);
               }}
-              className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer group"
-              title="Semester Planner"
+              className="w-full h-9 px-3 rounded-lg bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium flex items-center justify-center gap-2 shadow-vercel-subtle transition cursor-pointer active:scale-[0.98]"
             >
-              <Calendar className="h-4 w-4 group-hover:scale-105 transition-transform" />
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>Add Courses</span>
             </button>
+          )}
 
-            {/* CGPA Mode / Graph Icon */}
-            <button
-              type="button"
-              onClick={() => {
-                if (mode !== 'gpa') handleModeToggle();
-                const el = document.getElementById("gpa-dashboard-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className={`h-9 w-9 rounded-lg border flex items-center justify-center transition-all cursor-pointer group ${
-                mode === 'gpa'
-                  ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black shadow-vercel-subtle'
-                  : 'border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
-              }`}
-              title="CGPA & Trajectory"
-            >
-              <TrendingUp className="h-4 w-4 group-hover:scale-105 transition-transform" />
-            </button>
+          {/* Workspace Navigation Links */}
+          <div className="space-y-1">
+            <span className="px-2.5 text-[10px] font-mono uppercase tracking-wider text-[#888888] block mb-1.5">
+              Workspace
+            </span>
 
-            {/* Categories / Curriculum Icon */}
             <button
               type="button"
               onClick={() => {
                 const el = document.getElementById("category-requirements-section");
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer group"
-              title="Category Requirements"
+              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
             >
-              <Layers className="h-4 w-4 group-hover:scale-105 transition-transform" />
+              <Layers className="h-4 w-4 text-[#0070f3] shrink-0" />
+              <span>Degree Overview</span>
             </button>
 
-            {/* Extra Tools / Drawer Toggle Button */}
             <button
               type="button"
-              onClick={() => setIsExtraSidebarOpen(prev => !prev)}
-              className={`h-9 w-9 rounded-lg border flex items-center justify-center transition-all cursor-pointer relative group ${
-                isExtraSidebarOpen
-                  ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
-                  : 'border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
-              }`}
-              title="Extra Tools & Utilities"
+              onClick={() => {
+                const el = document.getElementById("gpa-dashboard-section");
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
             >
-              <Menu className="h-4 w-4 group-hover:scale-105 transition-transform" />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+              <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span>CGPA &amp; Trajectory</span>
             </button>
-          </nav>
+
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("semester-planner-section");
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+            >
+              <Calendar className="h-4 w-4 text-amber-500 shrink-0" />
+              <span>Semester Planner</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsCapstoneCollapsed(false);
+                const el = document.getElementById("capstone-section");
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+            >
+              <GraduationCap className="h-4 w-4 text-purple-500 shrink-0" />
+              <span>CSE400 Capstone</span>
+            </button>
+          </div>
+
+          {/* Academic Tools & Modals */}
+          {isOnboarded && (
+            <div className="space-y-1 pt-2 border-t border-[#ebebeb] dark:border-[#1f1f1f]">
+              <span className="px-2.5 text-[10px] font-mono uppercase tracking-wider text-[#888888] block mb-1.5">
+                Utilities
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickGradesInitialSemIdx(0);
+                  setIsQuickGradesModalOpen(true);
+                }}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Zap className="h-4 w-4 text-[#0070f3] shrink-0" />
+                <span>Quick Grades</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPrereqChainsModal(true)}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <GitBranch className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>Pre-req Chain</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowRoiModal(true)}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Repeat className="h-4 w-4 text-cyan-500 shrink-0" />
+                <span>Retake ROI Analyzer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowRoadmapModal(true)}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Compass className="h-4 w-4 text-rose-500 shrink-0" />
+                <span>Curriculum Roadmap</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowGradeSheetModal(true)}
+                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              >
+                <Camera className="h-4 w-4 text-indigo-500 shrink-0" />
+                <span>Progress Snapshot</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsExtraSidebarOpen(prev => !prev)}
+                className={`w-full px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                  isExtraSidebarOpen
+                    ? 'bg-[#f5f5f5] dark:bg-[#161616] text-[#171717] dark:text-white'
+                    : 'text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Menu className="h-4 w-4 text-[#888888] shrink-0" />
+                  <span>Backups &amp; Reset</span>
+                </span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Bottom: Theme Toggle & Cloud Sync */}
-        <div className="flex flex-col items-center gap-2 w-full mt-auto">
-          {/* Theme Toggle Button */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer"
-            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+        {/* Bottom: Theme Toggle & Cloud Sync Profile Card */}
+        <div className="flex flex-col gap-2 w-full pt-3 border-t border-[#ebebeb] dark:border-[#1f1f1f]">
+          <div className="flex items-center justify-between gap-2">
+            {/* Cloud Sync / Profile Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setGatekeeperError(null);
+                setShowCloudModal(true);
+              }}
+              className="flex-1 px-2.5 py-2 rounded-lg border border-[#ebebeb] dark:border-[#242424] bg-[#fafafa] dark:bg-[#121212] hover:bg-[#f0f0f0] dark:hover:bg-[#181818] flex items-center gap-2 transition-all cursor-pointer min-w-0"
+              title={cloudUser ? `Google Drive Synced • ${cloudUser.email}` : "Sign in with G-Suite"}
+            >
+              {cloudUser?.picture ? (
+                <img src={cloudUser.picture} alt="Profile" className="h-5 w-5 rounded-full object-cover shrink-0" />
+              ) : (
+                <Cloud className={`h-4 w-4 shrink-0 ${cloudUser ? 'text-[#0070f3]' : 'text-[#888888]'}`} />
+              )}
+              <span className="text-[11px] font-medium text-[#171717] dark:text-[#ededed] truncate">
+                {cloudUser ? cloudUser.name : "Cloud Sync"}
+              </span>
+            </button>
 
-          {/* Cloud Sync / Profile Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setGatekeeperError(null);
-              setShowCloudModal(true);
-            }}
-            className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center justify-center transition-all cursor-pointer relative"
-            title={cloudUser ? `Google Drive Synced • ${cloudUser.email}` : "Sign in with G-Suite"}
-          >
-            {cloudUser?.picture ? (
-              <img src={cloudUser.picture} alt="Profile" className="h-6 w-6 rounded-full object-cover border border-[#ebebeb] dark:border-[#262626]" />
-            ) : (
-              <Cloud className={`h-4 w-4 ${cloudUser ? 'text-[#0070f3]' : 'text-[#888888]'}`} />
-            )}
-            {cloudUser && (
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
-            )}
-          </button>
+            {/* Theme Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="h-9 w-9 rounded-lg border border-[#ebebeb] dark:border-[#242424] bg-[#fafafa] dark:bg-[#121212] hover:bg-[#f0f0f0] dark:hover:bg-[#181818] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer shrink-0"
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -4002,7 +3992,7 @@ export default function Home() {
             className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
           />
 
-          <div className="fixed top-0 left-0 lg:left-16 h-screen w-80 sm:w-88 bg-white dark:bg-[#0a0a0a] border-r border-[#ebebeb] dark:border-[#262626] z-50 p-6 flex flex-col justify-between shadow-vercel-modal animate-in slide-in-from-left duration-200 overflow-y-auto">
+          <div className="fixed top-0 left-0 lg:left-56 h-screen w-80 sm:w-88 bg-white dark:bg-[#0a0a0a] border-r border-[#ebebeb] dark:border-[#262626] z-50 p-6 flex flex-col justify-between shadow-vercel-modal animate-in slide-in-from-left duration-200 overflow-y-auto">
             <div className="space-y-6">
               {/* Drawer Header */}
               <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#262626] pb-4">
@@ -4085,6 +4075,24 @@ export default function Home() {
               {/* Academic Utilities */}
               <div className="space-y-2">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888] px-1 block mb-1">Academic Utilities</span>
+
+                {/* Pre-req Chain Sequence Viewer */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPrereqChainsModal(true);
+                    setIsExtraSidebarOpen(false);
+                  }}
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
+                >
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-emerald-500 shrink-0">
+                    <GitBranch className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Pre-req Chain</p>
+                    <p className="text-[11px] text-[#888888]">CSE &amp; MNS sequence progress</p>
+                  </div>
+                </button>
 
                 {/* Feeling Lost Roadmap */}
                 <button
@@ -4206,604 +4214,726 @@ export default function Home() {
 
       {/* 4. Main Body Container (either Onboarding Wizard or Bento Dashboard) */}
       {!isOnboarded ? (
-        /* Onboarding Wizard Modal overlay if not onboarded */
-        <div className="flex-1 flex items-center justify-center p-4 md:p-6 bg-[#fafafa] dark:bg-[#000000] transition-colors">
-          <div className="w-full max-w-lg mx-auto bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl shadow-vercel-modal relative overflow-hidden p-6 sm:p-8 space-y-6 text-[#171717] dark:text-[#ededed]">
-            
-            {/* Header & Step Indicators */}
-            <div className="relative z-10 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg border border-[#ebebeb] dark:border-[#262626] bg-[#f5f5f5] dark:bg-[#141414] flex items-center justify-center text-[#171717] dark:text-white">
-                    <BookOpen className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[#888888]">Curriculum Setup</h3>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626]">
-                  <span className="text-[10px] font-mono text-[#888888] uppercase">Step</span>
-                  <span className="text-xs font-mono font-semibold text-[#171717] dark:text-white">{wizardStep}/3</span>
-                </div>
-              </div>
+        /* Onboarding Wizard Modal overlay if not onboarded — Landing Page Vercel Developer Platform Aesthetic */
+        <div className="flex-1 flex items-center justify-center p-4 md:p-6 bg-[#fafafa] dark:bg-[#050505] relative overflow-hidden transition-colors">
+          {/* Vercel Structural Grid + Atmospheric Radial Spotlight */}
+          <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808014_1px,transparent_1px),linear-gradient(to_bottom,#80808014_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_85%_65%_at_50%_20%,#000_65%,transparent_100%)]" />
+            <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[680px] h-[340px] bg-gradient-to-tr from-[#0070f3]/14 via-cyan-500/8 to-transparent rounded-full blur-[100px]" />
+          </div>
 
-              {/* Progress bar */}
-              <div className="flex gap-2 w-full">
-                {[1, 2, 3].map(s => (
-                  <div
-                    key={s}
-                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                      s <= wizardStep 
-                        ? 'bg-[#171717] dark:bg-white' 
-                        : 'bg-[#ebebeb] dark:bg-[#262626]'
-                    }`}
-                  />
-                ))}
+          <div className="w-full max-w-2xl mx-auto bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal relative z-10 overflow-hidden text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar (matches Landing Page preview window) */}
+            <div className="px-4 sm:px-5 py-2.5 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
               </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/setup</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded font-medium">
+                STEP {wizardStep} OF 3
+              </span>
             </div>
 
-            {/* Step 1: Starting State (Credit vs. Non-Credit) */}
-            {wizardStep === 1 && (
-              <div className="space-y-6 relative z-10">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">1st Semester Starting State</h2>
-                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
-                    How did you start your 1st Semester at BRACU? Choose your starting entry point to map your calculus and English pathways.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Pathway Buttons */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setOnboardingData({
-                        ...onboardingData,
-                        pathway: 'foundation',
-                        foundationOption: onboardingData.foundationOption || 'opt1',
-                        creditOption: null
-                      })}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between h-28 cursor-pointer ${
-                        onboardingData.pathway === 'foundation'
-                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
+            <div className="p-5 sm:p-7 space-y-6">
+              {/* Interactive Step Indicator Pills */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { step: 1, title: "1. Intake & RS", sub: "Current Sem & Term" },
+                  { step: 2, title: "2. 1st Sem Entry", sub: "Credit vs. Remedial" },
+                  { step: 3, title: "3. Add Courses", sub: "Populate Past Terms" },
+                ].map((item) => {
+                  const isActive = wizardStep === item.step;
+                  const isDone = wizardStep > item.step;
+                  return (
+                    <div
+                      key={item.step}
+                      className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${
+                        isActive
+                          ? "bg-[#fafafa] dark:bg-[#141414] border-[#0070f3]/40 shadow-vercel-subtle"
+                          : isDone
+                          ? "bg-[#fafafa] dark:bg-[#111111] border-emerald-500/30"
+                          : "bg-[#fafafa]/50 dark:bg-[#0e0e0e] border-[#ebebeb] dark:border-[#222222] opacity-65"
                       }`}
                     >
-                      <div className="h-7 w-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
-                        <BookOpen className="h-3.5 w-3.5" />
+                      <div className="min-w-0">
+                        <p className={`text-[11px] font-semibold truncate ${isActive ? "text-[#0070f3]" : "text-[#171717] dark:text-[#ededed]"}`}>
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] font-mono text-[#888888] truncate hidden sm:block">
+                          {item.sub}
+                        </p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#171717] dark:text-white">Pathway A</p>
-                        <p className="text-[11px] text-[#888888] mt-0.5">Non-Credit Foundation</p>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => setOnboardingData({
-                        ...onboardingData,
-                        pathway: 'credit',
-                        creditOption: onboardingData.creditOption || 'opt1',
-                        foundationOption: null
-                      })}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between h-28 cursor-pointer ${
-                        onboardingData.pathway === 'credit'
-                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                      }`}
-                    >
-                      <div className="h-7 w-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
-                        <Award className="h-3.5 w-3.5" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-[#171717] dark:text-white">Pathway B</p>
-                        <p className="text-[11px] text-[#888888] mt-0.5">Direct Credit Courses</p>
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Sub-options for Pathway A */}
-                  {onboardingData.pathway === 'foundation' && (
-                    <div className="space-y-2.5 pt-2">
-                      <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Select required non-credit courses:</label>
-                      
-                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
-                        onboardingData.remedialEng091Checked
-                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
-                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={onboardingData.remedialEng091Checked}
-                          onChange={(e) => setOnboardingData({ ...onboardingData, remedialEng091Checked: e.target.checked })}
-                          className="sr-only"
-                        />
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
-                          onboardingData.remedialEng091Checked
-                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
-                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
-                        }`}>
-                          {onboardingData.remedialEng091Checked && (
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">ENG091 ({COURSES.find(c => c.code === "ENG091")?.title})</p>
-                          <p className="text-[11px] text-[#888888] mt-0.5">Required for foundation English grounding</p>
-                        </div>
-                      </label>
-
-                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
-                        onboardingData.remedialMat091Checked
-                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
-                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={onboardingData.remedialMat091Checked}
-                          onChange={(e) => setOnboardingData({ ...onboardingData, remedialMat091Checked: e.target.checked })}
-                          className="sr-only"
-                        />
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
-                          onboardingData.remedialMat091Checked
-                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
-                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
-                        }`}>
-                          {onboardingData.remedialMat091Checked && (
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">MAT091 ({COURSES.find(c => c.code === "MAT091")?.title})</p>
-                          <p className="text-[11px] text-[#888888] mt-0.5">Basic remedial pre-calculus algebra</p>
-                        </div>
-                      </label>
-
-                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
-                        onboardingData.remedialMat092Checked
-                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
-                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={onboardingData.remedialMat092Checked}
-                          onChange={(e) => setOnboardingData({ ...onboardingData, remedialMat092Checked: e.target.checked })}
-                          className="sr-only"
-                        />
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
-                          onboardingData.remedialMat092Checked
-                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
-                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
-                        }`}>
-                          {onboardingData.remedialMat092Checked && (
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">MAT092 ({COURSES.find(c => c.code === "MAT092")?.title})</p>
-                          <p className="text-[11px] text-[#888888] mt-0.5">Intermediate remedial algebra prior to MAT110 Calculus</p>
-                        </div>
-                      </label>
+                      {isDone ? (
+                        <span className="h-4 w-4 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-[10px] font-bold shrink-0">✓</span>
+                      ) : (
+                        <span className={`h-2 w-2 rounded-full shrink-0 ${isActive ? "bg-[#0070f3]" : "bg-[#d4d4d8] dark:bg-[#2a2a2a]"}`} />
+                      )}
                     </div>
-                  )}
-
-                  {/* Sub-options for Pathway B */}
-                  {onboardingData.pathway === 'credit' && (
-                    <div className="space-y-2.5 pt-2">
-                      <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Select starting English course:</label>
-                      
-                      <button
-                        onClick={() => {
-                          const nextPriorStatus = onboardingData.engStatusPriorToRS === 'caseD'
-                            ? null
-                            : onboardingData.engStatusPriorToRS;
-                          setOnboardingData({
-                            ...onboardingData,
-                            creditOption: 'opt1',
-                            engStatusPriorToRS: nextPriorStatus
-                          });
-                        }}
-                        className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                          onboardingData.creditOption === 'opt1'
-                            ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                            : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold text-xs text-[#171717] dark:text-white">Option 1: Started with ENG101</p>
-                          <p className="text-[11px] text-[#888888] mt-0.5">Assigns ENG101 to Semester 1</p>
-                        </div>
-                        {onboardingData.creditOption === 'opt1' && <Check className="h-4 w-4 text-[#0070f3]" />}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          const nextPriorStatus = (onboardingData.engStatusPriorToRS === 'caseA' || onboardingData.engStatusPriorToRS === 'caseD')
-                            ? onboardingData.engStatusPriorToRS
-                            : null;
-                          setOnboardingData({
-                            ...onboardingData,
-                            creditOption: 'opt2',
-                            engStatusPriorToRS: nextPriorStatus
-                          });
-                        }}
-                        className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                          onboardingData.creditOption === 'opt2'
-                            ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                            : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                        }`}
-                      >
-                        <div>
-                          <p className="font-semibold text-xs text-[#171717] dark:text-white">Option 2: Started with ENG102</p>
-                          <p className="text-[11px] text-[#888888] mt-0.5">Assigns ENG102 to Semester 1</p>
-                        </div>
-                        {onboardingData.creditOption === 'opt2' && <Check className="h-4 w-4 text-[#0070f3]" />}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => setWizardStep(2)}
-                    disabled={!onboardingData.pathway}
-                    className="px-5 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
-                  >
-                    Continue
-                  </button>
-                </div>
+                  );
+                })}
               </div>
-            )}
 
-            {/* Step 2: RS Semester and Placement status */}
-            {wizardStep === 2 && (
-              <div className="space-y-6 relative z-10">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">Intake &amp; RS Placement</h2>
-                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
-                    Set up your starting intake and Residential Semester (RS) details to automatically organize your curriculum pathway.
-                  </p>
-                </div>
-
-                <div className="space-y-5">
-                  {/* Select RS Term */}
-                  <div className="space-y-2">
-                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">When will you attend RS?</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["3rd Semester", "4th Semester", "5th Semester"] as const).map(term => (
-                        <button
-                          key={term}
-                          onClick={() => setOnboardingData({ ...onboardingData, rsTerm: term })}
-                          className={`p-3 rounded-lg border text-xs font-medium text-center transition-all cursor-pointer ${
-                            onboardingData.rsTerm === term
-                              ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                              : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                          }`}
-                        >
-                          {term}
-                        </button>
-                      ))}
+              {/* STEP 1: Current Semester, Intake & RS Placement (First Popup!) */}
+              {wizardStep === 1 && (
+                <div className="space-y-5 relative z-10">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0070f3]/10 border border-[#0070f3]/20 text-[10px] font-mono text-[#0070f3] mb-2">
+                      <span>[ TIMELINE CONFIGURATION ]</span>
                     </div>
+                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                      Current Semester, Intake &amp; RS
+                    </h2>
+                    <p className="text-[#666666] dark:text-[#888888] text-xs mt-1 leading-relaxed">
+                      Select which semester you are currently in, your starting intake, and when you attend Residential Semester (RS).
+                    </p>
                   </div>
 
-                  {/* Select Starting Intake */}
-                  <div className="space-y-2">
-                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Starting intake:</label>
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* 3-Column Bento Grid: Current Semester, Starting Term, Starting Year */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-1.5">
+                      <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                        Current Semester
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={onboardingData.currentSemesterNumber || 1}
+                          onChange={(e) => setOnboardingData({ ...onboardingData, currentSemesterNumber: parseInt(e.target.value, 10) })}
+                          className="w-full appearance-none bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs pl-3 pr-8 py-2 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#0070f3] transition cursor-pointer font-semibold"
+                        >
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num}>{getOrdinal(num)} Semester</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-1.5">
+                      <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                        Starting Term
+                      </label>
                       <div className="relative">
                         <select
                           value={onboardingData.startingTerm}
                           onChange={(e) => setOnboardingData({ ...onboardingData, startingTerm: e.target.value as any })}
-                          className="w-full appearance-none bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] text-xs pl-3.5 pr-8 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#171717] dark:focus:border-white transition cursor-pointer font-medium"
+                          className="w-full appearance-none bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs pl-3 pr-8 py-2 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#0070f3] transition cursor-pointer font-semibold"
                         >
                           <option value="Spring">Spring</option>
                           <option value="Summer">Summer</option>
                           <option value="Fall">Fall</option>
                         </select>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
+                        <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
                           <ChevronDown className="h-3.5 w-3.5" />
                         </div>
                       </div>
-                      
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-1.5">
+                      <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                        Starting Year
+                      </label>
                       <div className="relative">
                         <select
                           value={onboardingData.startingYear}
-                          onChange={(e) => setOnboardingData({ ...onboardingData, startingYear: parseInt(e.target.value) })}
-                          className="w-full appearance-none bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] text-xs pl-3.5 pr-8 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#171717] dark:focus:border-white transition cursor-pointer font-medium"
+                          onChange={(e) => setOnboardingData({ ...onboardingData, startingYear: parseInt(e.target.value, 10) })}
+                          className="w-full appearance-none bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs pl-3 pr-8 py-2 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#0070f3] transition cursor-pointer font-semibold"
                         >
                           {Array.from({ length: 11 }, (_, i) => 2020 + i).map(year => (
                             <option key={year} value={year}>{year}</option>
                           ))}
                         </select>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
+                        <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
                           <ChevronDown className="h-3.5 w-3.5" />
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Select Stream 1 Status Prior to RS */}
-                  <div className="space-y-2 pt-1">
-                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">
-                      Stream 1 Status Prior to RS:
-                    </label>
-                    <div className="space-y-2">
-                      {onboardingData.creditOption === 'opt2' ? (
-                        <>
-                          <button
-                            onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseA' })}
-                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              onboardingData.engStatusPriorToRS === 'caseA'
-                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                            }`}
-                          >
-                            <div>
-                              <p className="font-medium text-xs text-[#171717] dark:text-white">Have not completed ENG102 before RS (taking ENG102 at RS)</p>
-                              <p className="text-[11px] text-[#0070f3] mt-0.5">RS card will assign: ENG102 as 4th course</p>
-                            </div>
-                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
-                          </button>
+                  {/* Residential Semester (RS) Flexible Selector: Quick Picks + Custom Semester # + Not Sure Yet */}
+                  <div className="p-4 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                        When do you attend Residential Semester (RS)?
+                      </label>
+                      <span className="text-[10px] font-mono text-[#0070f3]">
+                        {onboardingData.rsTerm === 'not_sure' ? 'Can be assigned later anytime' : `Assigned to ${onboardingData.rsTerm}`}
+                      </span>
+                    </div>
 
+                    {/* Quick presets: 3rd, 4th, 5th, or Not Sure Yet */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { label: "3rd Semester", value: "3rd Semester" },
+                        { label: "4th Semester", value: "4th Semester" },
+                        { label: "5th Semester", value: "5th Semester" },
+                        { label: "Not Sure Yet", value: "not_sure" },
+                      ].map((opt) => {
+                        const isSelected = onboardingData.rsTerm === opt.value;
+                        return (
                           <button
-                            onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseD' })}
-                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              onboardingData.engStatusPriorToRS === 'caseD'
-                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setOnboardingData({ ...onboardingData, rsTerm: opt.value })}
+                            className={`p-2.5 rounded-lg border text-xs font-medium text-center transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              isSelected
+                                ? "bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-[#0a0a0a] shadow-vercel-subtle font-semibold"
+                                : "bg-white dark:bg-[#181818] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#666666] dark:text-[#a1a1a1] hover:border-[#888888]"
                             }`}
                           >
-                            <div>
-                              <p className="font-medium text-xs text-[#171717] dark:text-white">Completed ENG102 before RS</p>
-                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
-                            </div>
-                            {onboardingData.engStatusPriorToRS === 'caseD' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
+                            <span>{opt.label}</span>
                           </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseA' })}
-                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              onboardingData.engStatusPriorToRS === 'caseA'
-                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                            }`}
-                          >
-                            <div>
-                              <p className="font-medium text-xs text-[#171717] dark:text-white">Passed ENG101, but NOT ENG102 before RS</p>
-                              <p className="text-[11px] text-[#0070f3] mt-0.5">RS card will assign: ENG102 as 4th course</p>
-                            </div>
-                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
-                          </button>
+                        );
+                      })}
+                    </div>
 
-                          <button
-                            onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseB' })}
-                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              onboardingData.engStatusPriorToRS === 'caseB'
-                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                            }`}
+                    {/* Or pick any custom semester number (2nd - 12th) */}
+                    <div className="pt-2 border-t border-[#ebebeb] dark:border-[#222222] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span className="text-[11px] text-[#666666] dark:text-[#888888]">
+                        Attending RS in a different semester number?
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-[#888888] uppercase">Custom Sem #:</span>
+                        <div className="relative">
+                          <select
+                            value={onboardingData.rsTerm === "not_sure" ? "not_sure" : onboardingData.rsTerm}
+                            onChange={(e) => setOnboardingData({ ...onboardingData, rsTerm: e.target.value })}
+                            className="appearance-none bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs pl-2.5 pr-7 py-1.5 rounded-lg text-[#171717] dark:text-[#ededed] font-mono font-medium outline-none focus:border-[#0070f3] cursor-pointer"
                           >
-                            <div>
-                              <p className="font-medium text-xs text-[#171717] dark:text-white">Passed ENG101 and ENG102 before RS</p>
-                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
-                            </div>
-                            {onboardingData.engStatusPriorToRS === 'caseB' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
-                          </button>
-
-                          <button
-                            onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseC' })}
-                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
-                              onboardingData.engStatusPriorToRS === 'caseC'
-                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
-                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
-                            }`}
-                          >
-                            <div>
-                              <p className="font-medium text-xs text-[#171717] dark:text-white">Failed ENG101 before RS</p>
-                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
-                            </div>
-                            {onboardingData.engStatusPriorToRS === 'caseC' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
-                          </button>
-                        </>
-                      )}
+                            {Array.from({ length: 11 }, (_, i) => i + 2).map((semNum) => {
+                              const label = `${getOrdinal(semNum)} Semester`;
+                              return (
+                                <option key={semNum} value={label}>
+                                  {label}
+                                </option>
+                              );
+                            })}
+                            <option value="not_sure">Not Sure / Decide Later</option>
+                          </select>
+                          <ChevronDown className="h-3 w-3 text-[#888888] pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    onClick={() => setWizardStep(1)}
-                    className="text-[#888888] hover:text-[#171717] dark:hover:text-white text-xs font-medium transition cursor-pointer px-4 py-2 rounded-full border border-[#ebebeb] dark:border-[#262626]"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (onboardingData.engStatusPriorToRS) {
-                        setWizardStep(3);
-                      }
-                    }}
-                    disabled={!onboardingData.engStatusPriorToRS}
-                    className="px-5 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
-                  >
-                    Next Step
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Summary and Generation */}
-            {wizardStep === 3 && (
-              <div className="space-y-6 relative z-10">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">Generate Study Plan</h2>
-                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
-                    Review your curriculum configuration before generating your custom degree plan:
-                  </p>
-                </div>
-
-                <div className="bg-[#f5f5f5] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl space-y-1 text-xs">
-                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
-                    <span className="text-[#888888] font-medium">Starting Pathway</span>
-                    <span className="text-right text-xs font-medium text-[#171717] dark:text-white capitalize">
-                      {onboardingData.pathway === 'foundation' ? "Non-Credit Foundation" : "Direct Credit Course"}
+                  <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#222222]">
+                    <span className="text-[11px] font-mono text-[#888888]">
+                      12 Default Semesters • Manual Course Control
                     </span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
-                    <span className="text-[#888888] font-medium">1st Semester Course</span>
-                    <span className="text-right text-xs font-mono font-medium text-[#0070f3]">
-                      {onboardingData.pathway === 'foundation' 
-                        ? ([
-                            onboardingData.remedialEng091Checked ? "ENG091" : null,
-                            onboardingData.remedialMat091Checked ? "MAT091" : null,
-                            onboardingData.remedialMat092Checked ? "MAT092" : null
-                          ].filter(Boolean).join(" + ") || "None (Remedial Exempt)")
-                        : (onboardingData.creditOption === 'opt1' ? "ENG101" : "ENG102")
-                      }
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
-                    <span className="text-[#888888] font-medium">RS Semester Card</span>
-                    <span className="text-right text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400">
-                      {onboardingData.rsTerm}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
-                    <span className="text-[#888888] font-medium">RS Course Population</span>
-                    <span className="text-right text-xs font-mono text-[#171717] dark:text-white">
-                      {onboardingData.engStatusPriorToRS === 'caseA' ? "EMB101 + HUM103 + BNG103 + ENG102" : "EMB101 + HUM103 + BNG103 + BU201"}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(2)}
+                      className="h-9 px-5 bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-medium rounded-lg hover:bg-black/90 dark:hover:bg-white shadow-vercel-subtle transition duration-150 cursor-pointer text-xs flex items-center gap-1.5"
+                    >
+                      <span>Continue</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
+              )}
 
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => setWizardStep(2)}
-                    className="text-[#888888] hover:text-[#171717] dark:hover:text-white text-xs font-medium transition cursor-pointer px-4 py-2 rounded-full border border-[#ebebeb] dark:border-[#262626]"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={() => {
-                      generateInitialPlan();
-                    }}
-                    className="px-6 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
-                  >
-                    Generate Plan
-                  </button>
+              {/* STEP 2: 1st Semester Entry Pathway (Credit vs. Non-Credit Foundation) */}
+              {wizardStep === 2 && (
+                <div className="space-y-5 relative z-10">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0070f3]/10 border border-[#0070f3]/20 text-[10px] font-mono text-[#0070f3] mb-2">
+                      <span>[ ENTRY PATHWAY ]</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                      1st Semester Starting Pathway
+                    </h2>
+                    <p className="text-[#666666] dark:text-[#888888] text-xs mt-1 leading-relaxed">
+                      Did you start directly with credit courses or take non-credit foundation (remedial) courses in your 1st semester?
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Pathway Bento Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setOnboardingData({
+                          ...onboardingData,
+                          pathway: 'credit',
+                          creditOption: onboardingData.creditOption || 'opt1',
+                          foundationOption: null
+                        })}
+                        className={`p-4 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between gap-3 cursor-pointer ${
+                          onboardingData.pathway === 'credit'
+                            ? 'bg-[#fafafa] dark:bg-[#141414] border-[#0070f3] text-[#171717] dark:text-white shadow-vercel-subtle'
+                            : 'bg-white dark:bg-[#111111] border-[#ebebeb] dark:border-[#242424] text-[#888888] hover:border-[#888888]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="h-8 w-8 rounded-lg bg-[#0070f3]/10 border border-[#0070f3]/25 flex items-center justify-center text-[#0070f3]">
+                            <GraduationCap className="h-4 w-4" />
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#0070f3]/10 text-[#0070f3] border border-[#0070f3]/20">
+                            DIRECT CREDIT
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Direct Credit Courses</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Started 1st Semester directly with ENG101 or ENG102</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setOnboardingData({
+                          ...onboardingData,
+                          pathway: 'foundation',
+                          foundationOption: onboardingData.foundationOption || 'opt1',
+                          creditOption: null
+                        })}
+                        className={`p-4 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between gap-3 cursor-pointer ${
+                          onboardingData.pathway === 'foundation'
+                            ? 'bg-[#fafafa] dark:bg-[#141414] border-[#0070f3] text-[#171717] dark:text-white shadow-vercel-subtle'
+                            : 'bg-white dark:bg-[#111111] border-[#ebebeb] dark:border-[#242424] text-[#888888] hover:border-[#888888]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
+                            <Compass className="h-4 w-4" />
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            NON-CREDIT
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Non-Credit Foundation</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Required ENG091, MAT091, or MAT092 in 1st Semester</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Sub-options for Direct Credit */}
+                    {onboardingData.pathway === 'credit' && (
+                      <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-2">
+                        <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                          Select your starting 1st Semester English course:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOnboardingData({ ...onboardingData, creditOption: 'opt1' })}
+                            className={`p-3 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
+                              onboardingData.creditOption === 'opt1'
+                                ? 'bg-white dark:bg-[#1a1a1a] border-[#171717] dark:border-[#ededed] text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white/60 dark:bg-[#151515] border-[#e5e5e5] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
+                            }`}
+                          >
+                            <div>
+                              <p className="font-semibold text-xs text-[#171717] dark:text-[#ededed]">Started with ENG101</p>
+                              <p className="text-[10px] font-mono text-[#888888] mt-0.5">English Fundamentals in Sem 1</p>
+                            </div>
+                            {onboardingData.creditOption === 'opt1' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setOnboardingData({ ...onboardingData, creditOption: 'opt2' })}
+                            className={`p-3 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
+                              onboardingData.creditOption === 'opt2'
+                                ? 'bg-white dark:bg-[#1a1a1a] border-[#171717] dark:border-[#ededed] text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white/60 dark:bg-[#151515] border-[#e5e5e5] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
+                            }`}
+                          >
+                            <div>
+                              <p className="font-semibold text-xs text-[#171717] dark:text-[#ededed]">Started with ENG102</p>
+                              <p className="text-[10px] font-mono text-[#888888] mt-0.5">English Composition I in Sem 1</p>
+                            </div>
+                            {onboardingData.creditOption === 'opt2' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-options for Non-Credit Foundation */}
+                    {onboardingData.pathway === 'foundation' && (
+                      <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] space-y-2">
+                        <label className="block text-[10px] font-mono text-[#888888] uppercase tracking-wider">
+                          Select required non-credit courses (0 Cr):
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {[
+                            { key: 'remedialEng091Checked' as const, code: 'ENG091', desc: 'Foundation English' },
+                            { key: 'remedialMat091Checked' as const, code: 'MAT091', desc: 'Basic Pre-Calculus' },
+                            { key: 'remedialMat092Checked' as const, code: 'MAT092', desc: 'Remedial Algebra' },
+                          ].map((rem) => {
+                            const checked = Boolean(onboardingData[rem.key]);
+                            return (
+                              <label
+                                key={rem.code}
+                                className={`flex items-center gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer ${
+                                  checked
+                                    ? 'bg-white dark:bg-[#1a1a1a] border-[#171717] dark:border-[#ededed] shadow-vercel-subtle'
+                                    : 'bg-white/60 dark:bg-[#151515] border-[#e5e5e5] dark:border-[#262626] hover:border-[#888888]'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => setOnboardingData({ ...onboardingData, [rem.key]: e.target.checked })}
+                                  className="sr-only"
+                                />
+                                <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 ${
+                                  checked
+                                    ? 'bg-[#0070f3] border-[#0070f3] text-white'
+                                    : 'border-[#d4d4d8] dark:border-[#333333] bg-white dark:bg-[#111111]'
+                                }`}>
+                                  {checked && <Check className="h-3 w-3 stroke-[3]" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-mono font-semibold text-[#171717] dark:text-[#ededed]">{rem.code}</p>
+                                  <p className="text-[10px] text-[#888888] truncate">{rem.desc}</p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#222222]">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(1)}
+                      className="h-9 px-4 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] text-xs font-medium transition cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleProceedToWizardStep3()}
+                      disabled={!onboardingData.pathway}
+                      className="h-9 px-5 bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-medium rounded-lg hover:bg-black/90 dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed shadow-vercel-subtle transition duration-150 cursor-pointer text-xs flex items-center gap-1.5"
+                    >
+                      <span>Next: Add Courses</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* STEP 3: Add Courses up to Current Semester via Multi-Semester Popup & Choose RS 4th Course */}
+              {wizardStep === 3 && (
+                <div className="space-y-5 relative z-10">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0070f3]/10 border border-[#0070f3]/20 text-[10px] font-mono text-[#0070f3] mb-2">
+                        <span>[ COURSE POPULATION • 1ST → {getOrdinal(onboardingData.currentSemesterNumber || 1).toUpperCase()} SEM ]</span>
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                        Populate Your Semesters
+                      </h2>
+                      <p className="text-[#666666] dark:text-[#888888] text-xs mt-1 leading-relaxed">
+                        Add courses to any semester up to your current semester using the multi-semester picker.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddCoursesTargetSemesterId(semesters[0]?.id || "sem-1");
+                        setAddCoursesPreselected([]);
+                        setIsAddCoursesModalOpen(true);
+                      }}
+                      className="h-9 px-3.5 bg-[#0070f3] hover:bg-[#0060df] text-white text-xs font-medium rounded-lg shadow-vercel-subtle flex items-center gap-1.5 shrink-0 cursor-pointer transition"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Open Multi-Semester Course Picker</span>
+                    </button>
+                  </div>
+
+                  {/* Semesters 1..currentSemesterNumber interactive list */}
+                  <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
+                    {semesters.slice(0, onboardingData.currentSemesterNumber || 1).map((sem, idx) => {
+                      const intake = semesterIntakes[idx];
+                      const semTermYear = `${sem.term || intake?.term || 'Spring'} ${sem.year || intake?.year || onboardingData.startingYear}`;
+                      const semCredits = sem.courses.reduce((sum, c) => {
+                        const info = COURSES.find(co => co.code === c.code);
+                        return sum + (info?.category === "Non-Credit" ? 0 : (info?.credits ?? 3));
+                      }, 0);
+                      const hasEng102InRS = sem.courses.some(c => c.code === "ENG102");
+                      const hasBu201InRS = sem.courses.some(c => c.code === "BU201");
+
+                      return (
+                        <div
+                          key={sem.id}
+                          className={`p-3.5 rounded-xl border space-y-2.5 transition-all ${
+                            sem.isRS
+                              ? "bg-indigo-500/[0.04] dark:bg-indigo-500/[0.06] border-indigo-500/30"
+                              : "bg-[#fafafa] dark:bg-[#111111] border-[#ebebeb] dark:border-[#242424]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              {sem.isRS && (
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-300 text-[10px] font-mono font-semibold">
+                                  SAVAR RS
+                                </span>
+                              )}
+                              <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed] truncate">
+                                {sem.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-[#888888]">
+                                ({semTermYear})
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] font-medium">
+                                {sem.courses.length} courses • {semCredits} Cr
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddCoursesTargetSemesterId(sem.id);
+                                setAddCoursesPreselected([]);
+                                setIsAddCoursesModalOpen(true);
+                              }}
+                              className="h-7 px-2.5 rounded-lg bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-[11px] font-medium flex items-center gap-1 shrink-0 cursor-pointer transition shadow-vercel-subtle"
+                            >
+                              <Plus className="h-3 w-3 text-[#0070f3]" />
+                              <span>Add Courses</span>
+                            </button>
+                          </div>
+
+                          {/* Special RS 4th Course Quick Selector (ENG102 vs. BU201) */}
+                          {sem.isRS && (
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-indigo-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="text-[11px]">
+                                <span className="font-semibold text-[#171717] dark:text-[#ededed]">
+                                  Choose 4th RS Course:
+                                </span>{" "}
+                                <span className="text-[#666666] dark:text-[#888888]">
+                                  (Alongside EMB101, HUM103 &amp; BNG103)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const isComp = (onboardingData.currentSemesterNumber || 1) > idx + 1;
+                                    setSemesters(prev => prev.map(s => {
+                                      if (s.id !== sem.id) {
+                                        // Also ensure ENG102 isn't duplicated elsewhere if moving to RS
+                                        return s;
+                                      }
+                                      const filtered = s.courses.filter(c => c.code !== "BU201" && c.code !== "ENG102");
+                                      return {
+                                        ...s,
+                                        courses: [...filtered, { code: "ENG102", grade: "", isCompleted: isComp }]
+                                      };
+                                    }));
+                                  }}
+                                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                                    hasEng102InRS
+                                      ? "bg-[#0070f3] border-[#0070f3] text-white shadow-vercel-subtle"
+                                      : "bg-[#fafafa] dark:bg-[#1f1f1f] border-[#e5e5e5] dark:border-[#2e2e2e] text-[#666666] dark:text-[#a1a1a1] hover:border-[#0070f3]"
+                                  }`}
+                                >
+                                  {hasEng102InRS && <Check className="h-3 w-3 stroke-[3]" />}
+                                  <span>+ ENG102</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const isComp = (onboardingData.currentSemesterNumber || 1) > idx + 1;
+                                    setSemesters(prev => prev.map(s => {
+                                      if (s.id !== sem.id) return s;
+                                      const filtered = s.courses.filter(c => c.code !== "ENG102" && c.code !== "BU201");
+                                      return {
+                                        ...s,
+                                        courses: [...filtered, { code: "BU201", grade: "", isCompleted: isComp }]
+                                      };
+                                    }));
+                                  }}
+                                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                                    hasBu201InRS
+                                      ? "bg-[#0070f3] border-[#0070f3] text-white shadow-vercel-subtle"
+                                      : "bg-[#fafafa] dark:bg-[#1f1f1f] border-[#e5e5e5] dark:border-[#2e2e2e] text-[#666666] dark:text-[#a1a1a1] hover:border-[#0070f3]"
+                                  }`}
+                                >
+                                  {hasBu201InRS && <Check className="h-3 w-3 stroke-[3]" />}
+                                  <span>+ BU201</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {sem.courses.length === 0 ? (
+                            <p className="text-[11px] text-[#888888] font-mono">
+                              No courses added yet — click &ldquo;+ Add Courses&rdquo; to assign courses.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {sem.courses.map((c) => {
+                                const theme = getCategoryTheme(undefined, c.code);
+                                return (
+                                  <span
+                                    key={c.code}
+                                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium ${theme.codePill}`}
+                                  >
+                                    <span>{c.code}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCourse(sem.id, c.code)}
+                                      className="opacity-70 hover:opacity-100 hover:text-rose-500 transition cursor-pointer"
+                                      title="Remove course"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Compact Configuration Summary Footer */}
+                  <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] px-3.5 py-2.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-[#666666] dark:text-[#888888]">
+                    <span>Default Plan: <strong className="text-[#171717] dark:text-[#ededed]">12 Semesters</strong></span>
+                    <span>RS Placement: <strong className="text-[#0070f3]">{onboardingData.rsTerm === "not_sure" ? "Not Sure Yet" : onboardingData.rsTerm}</strong></span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#222222]">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(2)}
+                      className="h-9 px-4 rounded-lg border border-[#e5e5e5] dark:border-[#262626] bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] text-xs font-medium transition cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        generateInitialPlan();
+                      }}
+                      className="h-9 px-5 bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-medium rounded-lg hover:bg-black/90 dark:hover:bg-white shadow-vercel-subtle transition duration-150 cursor-pointer text-xs flex items-center gap-1.5"
+                    >
+                      <span>Finish &amp; Open Workspace</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : (
-        /* Actual App Dashboard in Bento Grid Layout */
-        <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 overflow-y-auto max-h-screen custom-scrollbar flex flex-col gap-6 pb-24 lg:pb-6">
-          <div className="w-full bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl p-4 sm:p-6 lg:p-7 shadow-vercel-card relative flex flex-col gap-6 transition-colors">
-            
-            {/* Bento Container Top Bar: Mode Toggle, Search, Degree Status & Profile */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-[#ebebeb] dark:border-[#262626] pb-5">
-              {/* Mode Toggler Pill */}
-              <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] p-1 rounded-full flex items-center gap-1 self-start md:self-auto shadow-vercel-subtle">
-                <button
-                  type="button"
-                  onClick={() => mode !== 'tracker' && handleModeToggle()}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    mode === 'tracker'
-                      ? 'bg-white dark:bg-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
-                      : 'text-[#888888] hover:text-[#171717] dark:hover:text-white'
-                  }`}
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Course Tracker</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => mode !== 'gpa' && handleModeToggle()}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                    mode === 'gpa'
-                      ? 'bg-white dark:bg-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
-                      : 'text-[#888888] hover:text-[#171717] dark:hover:text-white'
-                  }`}
-                >
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Course + CGPA</span>
-                </button>
-              </div>
+        /* Actual App Dashboard in Bento Grid Layout — Landing Page Vercel Developer Platform Aesthetic */
+        <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 lg:h-screen overflow-y-auto custom-scrollbar flex flex-col gap-6 pb-24 lg:pb-8 relative bg-[#fafafa] dark:bg-[#050505]">
+          {/* Vercel Structural Grid + Atmospheric Radial Spotlight */}
+          <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_90%_70%_at_50%_10%,#000_60%,transparent_100%)]" />
+            <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[820px] h-[340px] bg-gradient-to-tr from-[#0070f3]/10 via-cyan-500/6 to-transparent rounded-full blur-[110px]" />
+          </div>
 
-              {/* Global Search Bar (Center) */}
-              <div className="relative flex-1 max-w-md mx-auto w-full">
-                <div className="relative flex items-center bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-full px-3.5 py-1.5 shadow-vercel-subtle focus-within:border-[#171717] dark:focus-within:border-white transition-colors">
-                  <Search className="h-3.5 w-3.5 text-[#888888] mr-2 shrink-0" />
-                  <input
-                    type="text"
-                    value={globalSearchQuery}
-                    onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                    placeholder="Search course code or title (e.g. CSE220)..."
-                    className="w-full bg-transparent text-xs text-[#171717] dark:text-[#ededed] placeholder-[#888888] focus:outline-none font-medium"
-                  />
-                  {globalSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setGlobalSearchQuery('')}
-                      className="text-[#888888] hover:text-[#171717] dark:hover:text-white p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
+          <div className="w-full shrink-0 bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal relative z-10 flex flex-col transition-colors">
+            {/* Window Chrome Bar (matches Landing Page preview window) */}
+            <div className="px-4 sm:px-6 py-2.5 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] rounded-t-2xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>route136.app/workspace</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded font-medium">
+                136-CR ENGINE
+              </span>
+            </div>
+
+            <div className="p-4 sm:p-6 lg:p-7 flex flex-col gap-6">
+              {/* Bento Container Top Bar: Workspace Status & Direct Action Buttons */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 border-b border-[#ebebeb] dark:border-[#222222] pb-4">
+              {/* Left: Workspace Title & Live Credit / CGPA Badges */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#0070f3]" />
+                  <h1 className="text-sm sm:text-base font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                    Degree Workspace
+                  </h1>
                 </div>
-
-                {/* Search Dropdown Results */}
-                {isSearchFocused && globalFilteredCourses.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-1.5 shadow-vercel-modal z-50 divide-y divide-[#ebebeb] dark:divide-[#262626] max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
-                    {globalFilteredCourses.map(course => (
-                      <div
-                        key={course.code}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setAddCoursesPreselected([course.code]);
-                          setIsAddCoursesModalOpen(true);
-                          setGlobalSearchQuery('');
-                          setIsSearchFocused(false);
-                        }}
-                        onClick={() => {
-                          setAddCoursesPreselected([course.code]);
-                          setIsAddCoursesModalOpen(true);
-                          setGlobalSearchQuery('');
-                          setIsSearchFocused(false);
-                        }}
-                        className="p-2.5 hover:bg-[#fafafa] dark:hover:bg-[#141414] rounded-lg flex items-center justify-between cursor-pointer transition group"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-xs text-[#171717] dark:text-white font-mono group-hover:text-[#0070f3]">{course.code}</span>
-                            <span className="text-[10px] text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-1.5 py-0.5 rounded font-mono">{course.credits} Cr</span>
-                          </div>
-                          <p className="text-[11px] text-[#888888] truncate mt-0.5">{course.title}</p>
-                        </div>
-                        <span className="text-[10px] text-[#0070f3] font-medium shrink-0 group-hover:underline">
-                          Add &rarr;
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Right Degree Status Badge & Profile */}
-              <div className="hidden md:flex items-center gap-3 shrink-0">
-                <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-3 py-1.5 rounded-full flex items-center gap-2 shadow-vercel-subtle">
+                <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-vercel-subtle">
                   <BadgeCheck className="h-3.5 w-3.5 text-[#0070f3]" />
-                  <span className="text-xs font-medium text-[#171717] dark:text-[#ededed]">136 Cr Degree</span>
-                  <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-white bg-white dark:bg-[#222222] border border-[#ebebeb] dark:border-[#333333] px-2 py-0.5 rounded-full">
-                    {cumulativeStats.completedCredits} Cr
+                  <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-[#ededed]">
+                    {cumulativeStats.completedCredits} <span className="text-[#888888]">/ 136 Cr</span>
                   </span>
                 </div>
+                <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-vercel-subtle">
+                  <span className="text-[10px] font-mono text-[#888888] uppercase">CGPA</span>
+                  <span className="text-[11px] font-mono font-semibold text-[#0070f3]">
+                    {cumulativeStats.cgpa.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Direct 1-Click Action Buttons (+ Add Courses, Roadmap, Snapshot, Tools) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddCoursesTargetSemesterId(null);
+                    setAddCoursesPreselected([]);
+                    setIsAddCoursesModalOpen(true);
+                  }}
+                  className="h-8 px-3 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                  <span>Add Courses</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPrereqChainsModal(true)}
+                  className="h-8 px-3 bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Open CSE & MNS Prerequisite Sequence Chains"
+                >
+                  <GitBranch className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>Pre-req Chain</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRoadmapModal(true)}
+                  className="h-8 px-3 bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Open CSE Curriculum Roadmap & Guide"
+                >
+                  <Compass className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span>Roadmap</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGradeSheetModal(true)}
+                  className="h-8 px-3 bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Export Academic Progress Snapshot PNG"
+                >
+                  <Camera className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span>Snapshot</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsExtraSidebarOpen(true)}
+                  className="h-8 px-2.5 bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Backups, Grading Scale & Reset"
+                >
+                  <Menu className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Data</span>
+                </button>
               </div>
             </div>
 
@@ -4841,275 +4971,129 @@ export default function Home() {
               </div>
             )}
 
-            {/* Top Row: 3 Modules Horizontally Adjacent (Degree Standing, Category Requirements, GenEd Streams) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
-              {/* 1. Degree Standing & Circular Speedometer Gauge */}
-              <div id="degree-standing-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between">
-                <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xs font-semibold text-[#171717] dark:text-white uppercase tracking-wider flex items-center gap-2">
-                    <BadgeCheck className="h-4 w-4 text-[#0070f3]" />
-                    Degree Standing
-                  </h2>
-                  <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-white bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2.5 py-0.5 rounded-full">
-                    {Math.round((cumulativeStats.completedCredits / 136) * 100)}%
-                  </span>
-                </div>
-
-                {/* Circular Speedometer Gauge SVG */}
-                <div className="flex flex-col items-center justify-center py-2 relative">
-                  <div className="relative w-36 h-36 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-                      {/* Background Track Circle */}
-                      <circle
-                        cx="60"
-                        cy="60"
-                        r="48"
-                        className="stroke-[#f0f0f0] dark:stroke-[#1f1f1f]"
-                        strokeWidth="8"
-                        fill="transparent"
-                      />
-                      {/* Animated Glowing Progress Circle */}
-                      <circle
-                        cx="60"
-                        cy="60"
-                        r="48"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        strokeDasharray={2 * Math.PI * 48}
-                        strokeDashoffset={2 * Math.PI * 48 * (1 - Math.min(1, cumulativeStats.completedCredits / 136))}
-                        strokeLinecap="round"
-                        fill="transparent"
-                        className="text-[#0070f3] transition-all duration-1000 ease-out"
-                      />
-                    </svg>
-                    {/* Center Readout */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-3xl font-semibold text-[#171717] dark:text-white font-mono tracking-tight">
-                        {cumulativeStats.completedCredits}
-                      </span>
-                      <span className="text-[11px] font-mono text-[#888888] tracking-wider">
-                        / 136 Cr
-                      </span>
-                      <span className="text-[10px] text-[#888888] mt-0.5">
-                        {Math.round((cumulativeStats.completedCredits / 136) * 100)}% Complete
-                      </span>
+            {/* Top Row: Compact 3-Card Executive Metric Strip (Degree Standing, Category Requirements, GenEd Streams) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+              {/* 1. Compact Degree Progress Card */}
+              <div id="degree-standing-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-4 shadow-vercel-card relative overflow-hidden flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between text-[11px] font-mono text-[#888888] mb-1">
+                    <span className="uppercase tracking-wider flex items-center gap-1.5">
+                      <BadgeCheck className="h-3.5 w-3.5 text-[#0070f3]" />
+                      <span>DEGREE PROGRESS</span>
+                    </span>
+                    <span className="text-[#0070f3] font-semibold">
+                      {((cumulativeStats.completedCredits / 136) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <div className="text-2xl font-semibold font-mono text-[#171717] dark:text-[#ededed]">
+                      {cumulativeStats.completedCredits} <span className="text-xs font-normal text-[#888888]">/ 136 Cr</span>
                     </div>
+                    <span className="text-[11px] font-mono text-[#888888]">
+                      {Math.max(0, 136 - cumulativeStats.completedCredits)} Cr left
+                    </span>
+                  </div>
+                  <div className="mt-2.5 h-2 w-full rounded-full bg-[#eaeaea] dark:bg-[#1f1f1f] overflow-hidden">
+                    <div
+                      style={{ width: `${Math.min(100, (cumulativeStats.completedCredits / 136) * 100)}%` }}
+                      className="h-full bg-[#0070f3] rounded-full transition-all duration-500"
+                    />
                   </div>
                 </div>
 
-                {/* Status Footer */}
-                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-[#888888] font-medium">
-                    <Target className="h-3.5 w-3.5 text-[#0070f3]" />
-                    <span>Degree Status</span>
+                {/* Mini summary pills */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#ebebeb] dark:border-[#222222] text-[11px] font-mono">
+                  <div className="px-2.5 py-1.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222] flex items-center justify-between">
+                    <span className="text-[#888888]">Terms</span>
+                    <span className="text-[#171717] dark:text-[#ededed] font-semibold">{semesters.length}</span>
                   </div>
-                  <span className="text-[11px] font-mono text-[#171717] dark:text-white bg-[#f5f5f5] dark:bg-[#1a1a1a] px-2.5 py-0.5 rounded-full border border-[#ebebeb] dark:border-[#262626]">
-                    {Math.max(0, 136 - cumulativeStats.completedCredits)} Credits to Graduate
-                  </span>
+                  <div className="px-2.5 py-1.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222] flex items-center justify-between">
+                    <span className="text-[#888888]">Thesis</span>
+                    <span className={isCSE400Passed ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-[#888888]"}>
+                      {isCSE400Passed ? "4/4 Cr" : "0/4 Cr"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* 2. Category Requirements (Program Core, School Core, Major Electives) */}
-              <div id="category-requirements-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-semibold text-[#171717] dark:text-white uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-[#0070f3]" />
-                    Category Requirements
-                  </h2>
-                  <span className="text-[11px] font-mono text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded-full">
-                    136 Cr
+              {/* 2. Compact Category Requirements Card */}
+              <div id="category-requirements-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-4 shadow-vercel-card relative overflow-hidden flex flex-col justify-between gap-2.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-[#888888]">
+                  <span className="uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-[#0070f3]" />
+                    <span>CORE &amp; ELECTIVES</span>
+                  </span>
+                  <span className="text-[#171717] dark:text-[#ededed] font-medium">
+                    {curriculumProgress.coreCompleted + curriculumProgress.schoolCoreCompleted + curriculumProgress.electiveCompleted} / 93 Cr
                   </span>
                 </div>
 
-                <div className="space-y-2.5 flex-1 flex flex-col justify-center">
-                  {/* Program Core */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('core')}
-                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
-                  >
-                    <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">Program Core</span>
-                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.coreCompleted} / {curriculumProgress.coreTotal} Cr</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${(curriculumProgress.coreCompleted / curriculumProgress.coreTotal) * 100}%` }}
-                        className="h-full bg-[#0070f3] rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* School Core */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('schoolCore')}
-                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
-                  >
-                    <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">School Core (Math/Sci)</span>
-                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.schoolCoreCompleted} / {curriculumProgress.schoolCoreTotal} Cr</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${(curriculumProgress.schoolCoreCompleted / curriculumProgress.schoolCoreTotal) * 100}%` }}
-                        className="h-full bg-cyan-600 dark:bg-cyan-400 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* CSE Major Electives */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('electives')}
-                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
-                  >
-                    <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">Major Electives</span>
-                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.electiveCompleted} / {curriculumProgress.electiveTotal} Cr</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${(curriculumProgress.electiveCompleted / curriculumProgress.electiveTotal) * 100}%` }}
-                        className="h-full bg-amber-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-                </div>
-
-                {/* Category Requirements Footer */}
-                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs text-[#888888]">
-                  <span>Completed: <strong className="text-[#171717] dark:text-white font-mono font-medium">{curriculumProgress.coreCompleted + curriculumProgress.schoolCoreCompleted + curriculumProgress.electiveCompleted}</strong> Cr</span>
-                  <span className="text-[11px] text-[#888888]">Click card to inspect</span>
+                <div className="space-y-1.5">
+                  {[
+                    { key: 'core', label: 'Program Core', done: curriculumProgress.coreCompleted, total: curriculumProgress.coreTotal, bar: 'bg-[#0070f3]' },
+                    { key: 'schoolCore', label: 'School Core (MNS)', done: curriculumProgress.schoolCoreCompleted, total: curriculumProgress.schoolCoreTotal, bar: 'bg-cyan-500' },
+                    { key: 'electives', label: 'Major Electives', done: curriculumProgress.electiveCompleted, total: curriculumProgress.electiveTotal, bar: 'bg-amber-500' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => setActiveCategorySelectorKey(cat.key)}
+                      className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] hover:border-[#888888] transition rounded-lg px-2.5 py-1.5 flex flex-col gap-1 group"
+                    >
+                      <div className="w-full flex justify-between items-center text-[11px]">
+                        <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">{cat.label}</span>
+                        <span className="text-[#888888] font-mono text-[10px]">{cat.done}/{cat.total} Cr</span>
+                      </div>
+                      <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${Math.min(100, (cat.done / cat.total) * 100)}%` }}
+                          className={`h-full ${cat.bar} rounded-full transition-all duration-300`}
+                        />
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* 3. GenEd Streams (S1-S5 & Free Choice) */}
-              <div id="gened-streams-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-semibold text-[#171717] dark:text-[#ededed] uppercase tracking-wider flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-[#0070f3]" />
-                    GenEd Streams
-                  </h2>
-                  <span className="text-[11px] font-mono text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded-full">
-                    39 Cr
+              {/* 3. Compact GenEd Streams (39 Cr) Matrix Card */}
+              <div id="gened-streams-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-4 shadow-vercel-card relative overflow-hidden flex flex-col justify-between gap-2.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-[#888888]">
+                  <span className="uppercase tracking-wider flex items-center gap-1.5">
+                    <Compass className="h-3.5 w-3.5 text-[#0070f3]" />
+                    <span>GENED STREAMS</span>
+                  </span>
+                  <span className="text-[#171717] dark:text-[#ededed] font-medium">
+                    {curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed + curriculumProgress.freeGenEdCredits} / 39 Cr
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 flex-1 items-center">
-                  {/* S1: Writing Comprehension */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('stream1')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S1: Writing Comprehension">S1: Writing</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream1Completed}/{curriculumProgress.stream1Total}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.stream1Completed / curriculumProgress.stream1Total) * 100)}%` }}
-                        className="h-full bg-rose-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* S2: Math & Natural Sciences */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('stream2')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S2: Math & Natural Sciences">S2: Math/Sci</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream2Completed}/{curriculumProgress.stream2Total}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.stream2Completed / curriculumProgress.stream2Total) * 100)}%` }}
-                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* S3: Arts & Humanities */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('stream3')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S3: Arts & Humanities">S3: Arts/Hum</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream3Completed}/{curriculumProgress.stream3Total}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.stream3Completed / curriculumProgress.stream3Total) * 100)}%` }}
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* S4: Social Sciences */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('stream4')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S4: Social Sciences">S4: Social Sci</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream4Completed}/{curriculumProgress.stream4Total}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.stream4Completed / curriculumProgress.stream4Total) * 100)}%` }}
-                        className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* S5: Communities (CST) */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('stream5')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S5: Communities (CST)">S5: CST</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream5Completed}/{curriculumProgress.stream5Total}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.stream5Completed / curriculumProgress.stream5Total) * 100)}%` }}
-                        className="h-full bg-teal-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-
-                  {/* Free GenEd Elective */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveCategorySelectorKey('freeGenEd')}
-                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
-                  >
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="Free GenEd Elective">Free GenEd</span>
-                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.freeGenEdCredits}/{curriculumProgress.freeGenEdTotal}</span>
-                    </div>
-                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${Math.min(100, (curriculumProgress.freeGenEdCredits / curriculumProgress.freeGenEdTotal) * 100)}%` }}
-                        className="h-full bg-slate-500 rounded-full transition-all duration-300"
-                      />
-                    </div>
-                  </button>
-                </div>
-
-                {/* GenEd Footer */}
-                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs text-[#888888]">
-                  <span>Completed: <strong className="text-[#171717] dark:text-white font-mono font-medium">{curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed + curriculumProgress.freeGenEdCredits}</strong> / 39 Cr</span>
-                  <span className="text-[11px] text-[#888888]">Distribution</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { key: 'stream1', label: 'S1: Writing', done: curriculumProgress.stream1Completed, total: curriculumProgress.stream1Total, bar: 'bg-rose-500' },
+                    { key: 'stream2', label: 'S2: Math/Sci', done: curriculumProgress.stream2Completed, total: curriculumProgress.stream2Total, bar: 'bg-blue-500' },
+                    { key: 'stream3', label: 'S3: Arts/Hum', done: curriculumProgress.stream3Completed, total: curriculumProgress.stream3Total, bar: 'bg-emerald-500' },
+                    { key: 'stream4', label: 'S4: Social Sci', done: curriculumProgress.stream4Completed, total: curriculumProgress.stream4Total, bar: 'bg-purple-500' },
+                    { key: 'stream5', label: 'S5: CST', done: curriculumProgress.stream5Completed, total: curriculumProgress.stream5Total, bar: 'bg-teal-500' },
+                    { key: 'freeGenEd', label: 'Free GenEd', done: curriculumProgress.freeGenEdCredits, total: curriculumProgress.freeGenEdTotal, bar: 'bg-slate-500' },
+                  ].map((st) => (
+                    <button
+                      key={st.key}
+                      type="button"
+                      onClick={() => setActiveCategorySelectorKey(st.key)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] hover:border-[#888888] text-left transition cursor-pointer flex flex-col justify-between gap-1 group"
+                    >
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-[#171717] dark:text-[#ededed] font-medium truncate group-hover:text-[#0070f3]">{st.label}</span>
+                        <span className="text-[#888888] font-mono text-[10px]">{st.done}/{st.total}</span>
+                      </div>
+                      <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${Math.min(100, (st.done / st.total) * 100)}%` }}
+                          className={`h-full ${st.bar} rounded-full transition-all duration-300`}
+                        />
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -5128,6 +5112,7 @@ export default function Home() {
                       standing: cumulativeStats.cgpa >= 2.0 ? "Good Standing" : "Probation Range"
                     }}
                     targetCgpa={targetCgpa}
+                    onTargetCgpaChange={(newTarget) => setTargetCgpa(newTarget)}
                     onOpenQuickGrades={() => {
                       setQuickGradesInitialSemIdx(0);
                       setIsQuickGradesModalOpen(true);
@@ -5576,11 +5561,11 @@ export default function Home() {
                         </div>
                       </div>
                     ) : (
-                      /* Expanded State Header */
-                      <div className="bg-[#fafafa] dark:bg-[#111111] p-3.5 rounded-t-xl border-b border-[#ebebeb] dark:border-[#262626] space-y-2.5 transition-colors duration-150">
-                        {/* Row 1: Checkbox + Title on left; Minimize + Trash on right */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                      /* Expanded State Header (Streamlined 2-Row Layout) */
+                      <div className="bg-[#fafafa] dark:bg-[#111111] p-3.5 rounded-t-xl border-b border-[#ebebeb] dark:border-[#262626] space-y-2 transition-colors duration-150">
+                        {/* Row 1: Checkbox + Title + Intake Pill on left; + Add Course + Collapse + Options Menu on right */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
                             <button
                               onClick={() => handleToggleSemesterAllCompleted(sem.id)}
                               title={isAllCompleted ? "Mark all incomplete" : "Mark all completed"}
@@ -5594,97 +5579,117 @@ export default function Home() {
                                 <Check className="h-3 w-3 stroke-[3]" />
                               )}
                             </button>
-                            <h3 className="font-semibold text-xs text-[#171717] dark:text-white tracking-tight truncate">
+                            <h3 className="font-semibold text-xs text-[#171717] dark:text-[#ededed] tracking-tight truncate">
                               {`Semester ${semIdx + 1}`}
                             </h3>
+                            {sem.isRS && (
+                              <span className="text-[9px] font-mono font-semibold bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3] px-1.5 py-0.5 rounded uppercase select-none">
+                                RS
+                              </span>
+                            )}
+                            <div className="flex items-center gap-1 bg-white dark:bg-[#181818] border border-[#ebebeb] dark:border-[#262626] rounded-md px-1.5 py-0.5">
+                              <select
+                                value={sem.term || intake?.term || 'Spring'}
+                                onChange={(e) => handleOverrideIntake(sem.id, e.target.value as any, sem.year || intake?.year || onboardingData.startingYear)}
+                                className="bg-transparent text-[11px] font-mono text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] outline-none cursor-pointer"
+                              >
+                                <option value="Spring">Spring</option>
+                                <option value="Summer">Summer</option>
+                                <option value="Fall">Fall</option>
+                              </select>
+                              <select
+                                value={sem.year || intake?.year || 2025}
+                                onChange={(e) => handleOverrideIntake(sem.id, sem.term || intake?.term || 'Spring', parseInt(e.target.value))}
+                                className="bg-transparent text-[11px] font-mono text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] outline-none cursor-pointer"
+                              >
+                                {Array.from({ length: 101 }, (_, i) => 2001 + i).map(year => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
 
-                          {/* Top Right Action Group: Minimize & Delete */}
-                          <div className="flex items-center gap-1 shrink-0">
+                          {/* Top Right Action Group: + Add Course, Minimize & More Menu */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                setAddCoursesTargetSemesterId(sem.id);
+                                setAddCoursesPreselected([]);
+                                setIsAddCoursesModalOpen(true);
+                              }}
+                              className="h-7 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black active:scale-95 px-2.5 rounded-md flex items-center gap-1 text-[11px] font-medium shadow-vercel-subtle transition cursor-pointer shrink-0"
+                              title="Add Course to Semester"
+                            >
+                              <Plus className="h-3 w-3 shrink-0 stroke-[2.5]" />
+                              <span>Add Course</span>
+                            </button>
+
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleToggleSemesterCollapse(sem.id);
                               }}
-                              className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#888888] hover:text-[#171717] dark:hover:text-white transition-colors cursor-pointer"
+                              className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition-colors cursor-pointer"
                               title="Minimize Semester"
                             >
                               <ChevronUp className="h-3.5 w-3.5" />
                             </button>
 
-                            <button
-                              onClick={() => handleDeleteSemester(sem.id)}
-                              className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-red-500/10 border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#ee0000] flex items-center justify-center transition-colors cursor-pointer"
-                              title="Delete Semester"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setActiveSemesterMenuId(prev => prev === sem.id ? null : sem.id)}
+                                className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-colors cursor-pointer font-mono text-xs"
+                                title="Semester Actions"
+                              >
+                                ⋯
+                              </button>
+                              {activeSemesterMenuId === sem.id && (
+                                <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-lg shadow-vercel-modal p-1 z-30 text-xs space-y-0.5">
+                                  {!sem.isRS && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleMarkAsRS(sem.id);
+                                        setActiveSemesterMenuId(null);
+                                      }}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] text-[#171717] dark:text-[#ededed] transition cursor-pointer"
+                                    >
+                                      Mark as RS Semester
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDeleteSemester(sem.id);
+                                      setActiveSemesterMenuId(null);
+                                    }}
+                                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-rose-500/10 text-[#ee0000] transition cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    <span>Delete Semester</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Row 2: Intake Selectors on left; Add Course Button on right */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <select
-                              value={sem.term || intake?.term || 'Spring'}
-                              onChange={(e) => handleOverrideIntake(sem.id, e.target.value as any, sem.year || intake?.year || onboardingData.startingYear)}
-                              className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[11px] text-[#171717] dark:text-[#ededed] rounded-md px-2 py-1 outline-none cursor-pointer font-medium"
-                            >
-                              <option value="Spring">Spring</option>
-                              <option value="Summer">Summer</option>
-                              <option value="Fall">Fall</option>
-                            </select>
-                            <select
-                              value={sem.year || intake?.year || 2025}
-                              onChange={(e) => handleOverrideIntake(sem.id, sem.term || intake?.term || 'Spring', parseInt(e.target.value))}
-                              className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[11px] text-[#171717] dark:text-[#ededed] rounded-md px-2 py-1 outline-none cursor-pointer font-medium"
-                            >
-                              {Array.from({ length: 101 }, (_, i) => 2001 + i).map(year => (
-                                <option key={year} value={year}>{year}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <button
-                            onClick={() => {
-                              setSwappingCourseCode(null);
-                              setActiveCourseSelectorSemesterId(sem.id);
-                            }}
-                            className="bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black active:scale-95 px-2.5 py-1 rounded-md flex items-center gap-1 text-xs font-medium shadow-vercel-subtle transition cursor-pointer shrink-0"
-                            title="Add Course to Semester"
-                          >
-                            <PlusCircle className="h-3.5 w-3.5 shrink-0" />
-                            <span>Add Course</span>
-                          </button>
-                        </div>
-
-                        {/* Row 3: Metrics (Credits, GPA, RS status) */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#262626] text-xs">
+                        {/* Row 2: Compact Metrics Strip (Credits & GPA) */}
+                        <div className="flex items-center justify-between pt-1.5 border-t border-[#ebebeb] dark:border-[#262626] text-xs">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[11px] font-medium text-[#888888] bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded">
-                              Credits: <strong className="text-[#171717] dark:text-white font-mono">{stats?.credits ?? 0}</strong>
+                              Credits: <strong className="text-[#171717] dark:text-[#ededed] font-mono">{stats?.credits ?? 0}</strong>
                             </span>
-                            {mode === 'gpa' && stats?.gpa != null && (
+                            {stats?.gpa != null && (
                               <span className="text-[11px] font-medium text-[#0070f3] bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">
-                                GPA: <strong className="font-mono">{stats.gpa.toFixed(2)}</strong>
+                                SGPA: <strong className="font-mono">{stats.gpa.toFixed(2)}</strong>
                               </span>
                             )}
                           </div>
-
-                          <div>
-                            {sem.isRS ? (
-                              <span className="text-[10px] font-mono font-medium bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] px-2 py-0.5 rounded tracking-wider uppercase select-none">
-                                RS
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleMarkAsRS(sem.id)}
-                                className="text-[10px] font-medium bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white px-2 py-0.5 rounded transition cursor-pointer"
-                              >
-                                Mark as RS
-                              </button>
-                            )}
-                          </div>
+                          <span className="text-[10px] font-mono text-[#888888]">
+                            {visibleCourses.length} course{visibleCourses.length !== 1 ? 's' : ''}
+                          </span>
                         </div>
                       </div>
                     )}
@@ -5711,6 +5716,7 @@ export default function Home() {
 
                         const isCreditCourse = courseDetails?.category !== "Non-Credit" && (courseDetails?.credits ?? 3) > 0;
                         const theme = getCategoryTheme(courseDetails?.category, c.code);
+                        const courseMenuKey = `${sem.id}_${c.code}_${cIdx}`;
 
                         return (
                           <div 
@@ -5733,7 +5739,7 @@ export default function Home() {
                                 : `p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] shadow-vercel-subtle flex flex-col md:flex-row md:items-center justify-between gap-2.5 relative`
                             } ${
                               draggingCourseCode === c.code 
-                                ? "border-[#171717] dark:border-white shadow-vercel-float" 
+                                ? "border-[#171717] dark:border-[#ededed] shadow-vercel-float" 
                                 : ""
                             }`}
                           >
@@ -5741,7 +5747,7 @@ export default function Home() {
                               {/* Left category accent bar */}
                               <div className={`w-1 self-stretch rounded-full ${theme.leftBar} shrink-0 opacity-80`} />
 
-                              {/* Left side checklist check & Mode B Grade dropdown */}
+                              {/* Left side checklist check & Grade dropdown */}
                               <div className="flex items-center gap-2 mt-0.5 shrink-0">
                                 <button
                                   onClick={() => handleCompletionToggle(sem.id, c.code, !c.isCompleted)}
@@ -5757,7 +5763,7 @@ export default function Home() {
                                   )}
                                 </button>
                                 
-                                {mode === 'gpa' && isCreditCourse && (
+                                {isCreditCourse && (
                                   <select
                                     value={c.grade}
                                     onChange={(e) => handleGradeChange(sem.id, c.code, e.target.value)}
@@ -5770,7 +5776,7 @@ export default function Home() {
                                   </select>
                                 )}
 
-                                {mode === 'gpa' && !isCreditCourse && c.isCompleted && (
+                                {!isCreditCourse && c.isCompleted && (
                                   <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase">
                                     Passed
                                   </span>
@@ -5779,7 +5785,7 @@ export default function Home() {
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="font-mono font-semibold text-xs tracking-tight px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-white">
+                                  <span className="font-mono font-semibold text-xs tracking-tight px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">
                                     {c.code}
                                   </span>
                                   <span className="text-[#171717] dark:text-[#ededed] font-medium text-xs truncate max-w-[200px] sm:max-w-none">
@@ -5829,47 +5835,60 @@ export default function Home() {
                               </div>
                             </div>
 
-                            {/* Right side selectors and management */}
-                            <div className="flex items-center gap-1 self-end md:self-auto shrink-0">
-                              
-                              {/* Move course dropdown/selection */}
-                              <div className="relative">
-                                <select
-                                  onChange={(e) => {
-                                    if (e.target.value) {
-                                      handleMoveCourse(sem.id, e.target.value, c);
-                                      e.target.value = ""; // Reset
-                                    }
-                                  }}
-                                  className="bg-white dark:bg-[#1a1a1a] hover:bg-[#fafafa] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[10px] font-medium text-[#888888] hover:text-[#171717] dark:hover:text-white rounded-md px-2 py-1 cursor-pointer transition focus:outline-none"
-                                >
-                                  <option value="">Move To...</option>
-                                  {semesters.filter(s => s.id !== sem.id).map(s => {
-                                    const destIdx = semesters.findIndex(semItem => semItem.id === s.id);
-                                    const { hp } = getCoursePrereqs(c.code, onboardingData.pathway, onboardingData.creditOption);
-                                    const missingHp = hp.filter(code => !isCourseCompletedPrior(code, destIdx, semesters, mode));
-                                    const isLocked = missingHp.length > 0;
-                                    const alreadyInDest = s.courses.some(course => course.code === c.code);
-                                    return (
-                                      <option key={s.id} value={s.id} disabled={isLocked || alreadyInDest}>
-                                        {s.name} {alreadyInDest ? "(Added)" : (isLocked ? "🔒" : "")}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                              </div>
-
-                              {/* Swap Course button */}
+                            {/* Compact Right-Side Course Actions (Popover Menu + Remove) */}
+                            <div className="flex items-center gap-1 self-end md:self-auto shrink-0 relative">
                               <button
-                                onClick={() => {
-                                  setActiveCourseSelectorSemesterId(sem.id);
-                                  setSwappingCourseCode(c.code);
-                                }}
-                                title="Swap Course"
-                                className="h-6 w-6 rounded-md bg-white dark:bg-[#1a1a1a] hover:bg-[#f0f0f0] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center transition cursor-pointer"
+                                type="button"
+                                onClick={() => setActiveCourseMenuKey(prev => prev === courseMenuKey ? null : courseMenuKey)}
+                                title="Move or Swap Course"
+                                className="h-6 w-6 rounded-md bg-white dark:bg-[#1a1a1a] hover:bg-[#f0f0f0] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition cursor-pointer font-mono text-xs"
                               >
-                                <ArrowRightLeft className="h-3 w-3" />
+                                ⋯
                               </button>
+
+                              {activeCourseMenuKey === courseMenuKey && (
+                                <div className="absolute right-7 top-full mt-1 w-48 bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-lg shadow-vercel-modal p-1.5 z-30 text-xs space-y-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveCourseSelectorSemesterId(sem.id);
+                                      setSwappingCourseCode(c.code);
+                                      setActiveCourseMenuKey(null);
+                                    }}
+                                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] text-[#171717] dark:text-[#ededed] flex items-center gap-2 transition cursor-pointer"
+                                  >
+                                    <ArrowRightLeft className="h-3 w-3 text-[#0070f3]" />
+                                    <span>Swap Course...</span>
+                                  </button>
+                                  <div className="border-t border-[#ebebeb] dark:border-[#222222] pt-1">
+                                    <span className="block px-2 py-0.5 text-[10px] font-mono text-[#888888] uppercase">Move to Term</span>
+                                    <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-0.5">
+                                      {semesters.filter(s => s.id !== sem.id).map(s => {
+                                        const destIdx = semesters.findIndex(semItem => semItem.id === s.id);
+                                        const { hp } = getCoursePrereqs(c.code, onboardingData.pathway, onboardingData.creditOption);
+                                        const missingHp = hp.filter(code => !isCourseCompletedPrior(code, destIdx, semesters, mode));
+                                        const isLocked = missingHp.length > 0;
+                                        const alreadyInDest = s.courses.some(course => course.code === c.code);
+                                        return (
+                                          <button
+                                            key={s.id}
+                                            type="button"
+                                            disabled={isLocked || alreadyInDest}
+                                            onClick={() => {
+                                              handleMoveCourse(sem.id, s.id, c);
+                                              setActiveCourseMenuKey(null);
+                                            }}
+                                            className="w-full text-left px-2 py-1 rounded hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] text-[#171717] dark:text-[#ededed] flex items-center justify-between cursor-pointer"
+                                          >
+                                            <span className="truncate">{s.name}</span>
+                                            {alreadyInDest ? <span className="text-[9px] text-[#888888]">Added</span> : isLocked ? <span className="text-[9px]">🔒</span> : null}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Remove Course button */}
                               <button
@@ -5948,6 +5967,7 @@ export default function Home() {
               onToggle={() => setIsCapstoneCollapsed(prev => !prev)} 
             />
           </div>
+          </div>
       </div>
 
       {/* Connect with me Footer at very bottom of dashboard */}
@@ -5998,10 +6018,25 @@ export default function Home() {
       {/* 4. Search and Add Course Combobox Overlay */}
       {activeCourseSelectorSemesterId !== null && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[85vh] text-[#171717] dark:text-[#ededed]">
-            
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[88vh] text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/swap-course</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                CATALOG
+              </span>
+            </div>
+
             {/* Combobox Header */}
-            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-white dark:bg-[#0c0c0c]">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-lg bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                   {swappingCourseCode ? <ArrowRightLeft className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
@@ -6098,9 +6133,11 @@ export default function Home() {
                           <span className="text-[10px] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2 py-0.5 rounded-md font-mono font-medium text-[#666666] dark:text-[#a1a1a1]">
                             {course.credits} Cr
                           </span>
-                          <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
-                            {theme.label}
-                          </span>
+                          {theme.label !== "Mandatory Core" && (
+                            <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
+                              {theme.label}
+                            </span>
+                          )}
                           {renderMandatoryBadge(course.code)}
                         </div>
                         <p className="text-[#4d4d4d] dark:text-[#b4b4b4] text-xs mt-1 font-medium truncate">{course.title}</p>
@@ -6149,14 +6186,39 @@ export default function Home() {
 
       {/* 4.5. Category Course Selector Modal Overlay */}
       {activeCategorySelectorKey !== null && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[85vh] text-[#171717] dark:text-[#ededed]">
-            
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setActiveCategorySelectorKey(null);
+            setSelectedCategoryCourseCode("");
+            setCategoryCourseSearchQuery("");
+          }}
+        >
+          <div
+            className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[88vh] text-[#171717] dark:text-[#ededed]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/category-selector</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                SYLLABUS
+              </span>
+            </div>
+
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-white dark:bg-[#0c0c0c]">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
-                  <BookOpen className="h-4 w-4" />
+                <div className="h-9 w-9 rounded-lg bg-[#0070f3]/10 border border-[#0070f3]/25 flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Layers className="h-4 w-4" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed] tracking-tight">
@@ -6173,7 +6235,7 @@ export default function Home() {
                   setSelectedCategoryCourseCode("");
                   setCategoryCourseSearchQuery("");
                 }} 
-                className="w-8 h-8 rounded-lg bg-white dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-[#fafafa] dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -6264,9 +6326,11 @@ export default function Home() {
                           <span className="text-[10px] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2 py-0.5 rounded-md font-mono font-medium text-[#666666] dark:text-[#a1a1a1]">
                             {course.credits} Cr
                           </span>
-                          <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
-                            {theme.label}
-                          </span>
+                          {theme.label !== "Mandatory Core" && (
+                            <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
+                              {theme.label}
+                            </span>
+                          )}
                           {renderMandatoryBadge(course.code)}
                           {isCompleted && (
                             <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-medium">
@@ -6343,35 +6407,59 @@ export default function Home() {
 
       {/* 5. Reset Confirmation Modal overlay */}
       {showResetConfirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-sm shadow-vercel-modal p-5 sm:p-6 space-y-4 text-[#171717] dark:text-[#ededed]">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-rose-500/10 border border-rose-500/25 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400">
-                <AlertTriangle className="h-4.5 w-4.5" />
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-sm shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
               </div>
-              <div>
-                <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed]">Reset Planner</h3>
-                <p className="text-[11px] text-rose-600 dark:text-rose-400 font-mono">Irreversible Action</p>
+              <div className="px-2.5 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                <span>route136.app/reset</span>
               </div>
+              <span className="text-[10px] font-mono text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
+                CONFIRM
+              </span>
             </div>
-            
-            <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
-              This action will permanently clear your course schedule, logged grades, and Capstone thesis records.
-            </p>
 
-            <div className="flex gap-2.5 pt-2">
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="flex-1 h-9 bg-[#fafafa] dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleResetData}
-                className="flex-1 h-9 bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
-              >
-                Wipe Data
-              </button>
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-rose-500/10 border border-rose-500/25 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed]">Reset Planner</h3>
+                  <p className="text-[11px] text-rose-600 dark:text-rose-400 font-mono">Irreversible Action</p>
+                </div>
+              </div>
+              
+              <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
+                This action will permanently clear your course schedule, logged grades, and Capstone thesis records.
+              </p>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="flex-1 h-9 bg-[#fafafa] dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetData}
+                  className="flex-1 h-9 bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
+                >
+                  Wipe Data
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -6433,303 +6521,315 @@ export default function Home() {
                     transformOrigin: 'top left',
                   }}
                 >
-                  {/* Visible Grade Sheet Node Target */}
+                  {/* Visible Grade Sheet Node Target (Landing Page Vercel Window Chrome Aesthetic) */}
                   <div 
                     id="flow136-grade-sheet-export-node"
                     style={{ 
-                      backgroundColor: '#030305',
+                      backgroundColor: '#050505',
                       fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                     }}
-                    className="w-[750px] min-w-[750px] h-auto min-h-[600px] border border-white/[0.12] rounded-3xl p-7 shadow-2xl text-slate-100 relative overflow-visible font-sans bg-[#030305]"
+                    className="w-[750px] min-w-[750px] h-auto min-h-[600px] border border-[#242424] rounded-2xl shadow-2xl text-[#ededed] relative overflow-hidden font-sans bg-[#050505]"
                   >
-                  {/* Ambient Background Glow (Z-Index 0) */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[160px] bg-indigo-500/[0.07] blur-3xl pointer-events-none rounded-full" />
-
-                  {/* Watermark Background (Z-Index 0) */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 overflow-hidden gap-6 opacity-[0.035]">
-                    <div className="h-28 w-28 rounded-3xl border-2 border-indigo-400 flex items-center justify-center">
-                      <Compass className="h-16 w-16 text-indigo-400" />
-                    </div>
-                    <span className="text-[85px] font-black tracking-tight text-white whitespace-nowrap">
-                      Route136
-                    </span>
-                  </div>
-
-                  {/* Section 1: Header (Z-Index 10) */}
-                  <div className="flex items-center justify-between pb-5 border-b border-white/[0.08] relative z-10">
-                    <div className="flex items-center gap-3.5">
-                      <div className="h-11 w-11 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.25)] shrink-0">
-                        <Compass className="h-6 w-6 text-indigo-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h1 className="text-2xl font-black tracking-tight text-white">Route136</h1>
-                          <span className="text-[10px] font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            CSE Curriculum
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold tracking-widest text-indigo-400 uppercase block mt-0.5">
-                          ACADEMIC PROGRESS &amp; GRADE REPORT
-                        </span>
-                      </div>
+                    {/* Vercel Structural 36px Grid + Atmospheric Radial Spotlight */}
+                    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+                      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808014_1px,transparent_1px),linear-gradient(to_bottom,#80808014_1px,transparent_1px)] bg-[size:36px_36px]" />
+                      <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[220px] bg-gradient-to-tr from-[#0070f3]/15 via-cyan-500/8 to-transparent rounded-full blur-[90px]" />
                     </div>
 
-                    <div className="text-right space-y-1">
-                      <div className="inline-block px-3 py-1 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs font-bold text-indigo-300">
-                        {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {/* Window Chrome Bar (Matches Landing Page Hero Mockup) */}
+                    <div className="px-5 py-3 bg-[#111111] border-b border-[#222222] flex items-center justify-between gap-2 relative z-10">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#2a2a2a]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#2a2a2a]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#2a2a2a]" />
                       </div>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        Target: 136 Degree Credits
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Section 2: Executive Status Bars & Standing (Z-Index 10) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-5 relative z-10">
-                    {/* Master Credits Box */}
-                    <div className="bg-[#08080f] border border-white/[0.08] p-4 rounded-2xl space-y-3 shadow-md">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-300 font-bold uppercase tracking-wider text-[10px]">Total Degree Progress</span>
-                        <span className="text-white font-black">{cumulativeStats.completedCredits} / 136 Cr Completed</span>
+                      <div className="px-3.5 py-0.5 rounded-md bg-[#0a0a0a] border border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        <span>route136.app/workspace</span>
                       </div>
-                      
-                      {/* Progress Bar */}
-                      <div className="h-3 w-full bg-[#030306] border border-white/[0.08] rounded-full overflow-hidden p-0.5 shadow-inner">
-                        <div 
-                          style={{ width: `${Math.min(100, (cumulativeStats.completedCredits / 136) * 100)}%` }}
-                          className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transition-all shadow-[0_0_12px_rgba(99,102,241,0.5)]"
-                        />
-                      </div>
-
-                      {/* Mini Categories & Timeline Stats */}
-                      <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-                        <div className="flex items-center justify-between p-2 rounded-xl bg-blue-500/[0.06] border border-blue-500/20">
-                          <span className="text-blue-300 font-semibold flex items-center gap-1.5 text-[10px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                            Dept Core
-                          </span>
-                          <span className="font-mono font-bold text-blue-200 text-[10px]">{curriculumProgress.coreCompleted}/{curriculumProgress.coreTotal} Cr</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-xl bg-cyan-500/[0.06] border border-cyan-500/20">
-                          <span className="text-cyan-300 font-semibold flex items-center gap-1.5 text-[10px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-                            School Core
-                          </span>
-                          <span className="font-mono font-bold text-cyan-200 text-[10px]">{curriculumProgress.schoolCoreCompleted}/{curriculumProgress.schoolCoreTotal} Cr</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-xl bg-amber-500/[0.06] border border-amber-500/20">
-                          <span className="text-amber-300 font-semibold flex items-center gap-1.5 text-[10px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                            Electives
-                          </span>
-                          <span className="font-mono font-bold text-amber-200 text-[10px]">{curriculumProgress.electiveCompleted}/6 Cr</span>
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-xl bg-purple-500/[0.06] border border-purple-500/20">
-                          <span className="text-purple-300 font-semibold flex items-center gap-1.5 text-[10px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-                            Capstone
-                          </span>
-                          <span className="font-mono font-bold text-purple-200 text-[10px]">{curriculumProgress.thesisCompleted}/{curriculumProgress.thesisTotal} Cr</span>
-                        </div>
-
-                        <div className="col-span-2 flex items-center justify-between p-2 rounded-xl bg-rose-500/[0.06] border border-rose-500/20">
-                          <span className="text-rose-300 font-semibold flex items-center gap-1.5 text-[10px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                            GenEd Streams
-                          </span>
-                          <span className="font-mono font-bold text-rose-200 text-[10px]">{curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed}/39 Cr</span>
-                        </div>
-
-                        <div className="col-span-2 pt-2 border-t border-white/[0.06] flex justify-between text-[10px] text-slate-400">
-                          <span>Semesters Planned: <strong className="text-indigo-300 font-mono">{semesters.length}</strong></span>
-                          <span>Completed Courses: <strong className="text-emerald-400 font-mono">{semesters.reduce((acc, sem) => acc + sem.courses.filter(c => mode === 'tracker' ? c.isCompleted : (c.isCompleted && c.grade !== "" && c.grade !== "F")).length, 0) + (isCSE400Passed ? 1 : 0)}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Academic Standing & CGPA Display */}
-                    {mode === 'gpa' ? (
-                      <div className="bg-[#08080f] border border-white/[0.08] p-4 rounded-2xl flex flex-col justify-between shadow-md">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cumulative CGPA</span>
-                          {cumulativeStats.cgpa >= 2.0 ? (
-                            <span className="inline-flex items-center justify-center whitespace-nowrap text-[9px] font-extrabold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                              Good Standing
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center justify-center whitespace-nowrap text-[9px] font-extrabold bg-rose-500/15 border border-rose-500/30 text-rose-300 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                              Academic Probation
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-3xl font-black text-white mt-1">
-                            {cumulativeStats.cgpa.toFixed(2)} <span className="text-xs text-slate-400 font-mono font-normal">/ 4.00</span>
-                          </div>
-                          <p className="text-[10px] text-slate-400 mt-1">
-                            Evaluated across chronologically latest course attempts.
-                          </p>
-                        </div>
-                        <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] text-slate-400">
-                          <span>Total Graded Credits: <strong className="text-white font-mono">{cumulativeStats.completedCredits} Cr</strong></span>
-                          <span>Scale: <strong className="text-indigo-300 font-mono">UGC 4.00</strong></span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-[#08080f] border border-white/[0.08] p-4 rounded-2xl flex flex-col justify-between shadow-md">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Planning Mode</span>
-                          <span className="text-[9px] font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2.5 py-0.5 rounded-full uppercase">
-                            Curriculum Tracker
-                          </span>
-                        </div>
-                        <div className="my-auto py-2">
-                          <p className="text-xs text-slate-200 font-semibold">
-                            Graduation Progress: {((cumulativeStats.completedCredits / 136) * 100).toFixed(1)}%
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-1">
-                            {136 - cumulativeStats.completedCredits > 0 
-                              ? `${136 - cumulativeStats.completedCredits} credits remaining to complete degree requirements.`
-                              : 'All degree credit requirements fulfilled!'}
-                          </p>
-                        </div>
-                        <div className="pt-2 border-t border-white/[0.06] text-[10px] text-slate-400 flex justify-between">
-                          <span>Target: 136 Credits</span>
-                          <span className="text-emerald-400 font-semibold">Track Active</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Section 3: Completed Courses Table / Grade Sheet (Z-Index 10) */}
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-indigo-400" />
-                        COMPLETED COURSEWORK
-                      </h2>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        Official Degree Audit
+                      <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2.5 py-0.5 rounded uppercase">
+                        {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                       </span>
                     </div>
-                    
-                    {(() => {
-                      const exportCompletedCourses: Array<{ code: string; title: string; credits: number; grade: string; semesterName: string }> = [];
-                      
-                      semesters.forEach((sem, semIdx) => {
-                        const intake = semesterIntakes[semIdx];
-                        const semTermYear = `${sem.term || intake?.term || 'Spring'} ${sem.year || intake?.year || 2025}`;
-                        const semLabel = sem.isRS ? `RS (${semTermYear})` : `${sem.name} (${semTermYear})`;
 
-                        sem.courses.forEach(c => {
-                          if (c.code === "CSE400") return;
-                          const isComp = mode === 'tracker' ? c.isCompleted : (c.isCompleted && c.grade !== "" && c.grade !== "F");
-                          if (isComp) {
-                            const cData = COURSES.find(co => co.code === c.code);
+                    {/* Inner Snapshot Body */}
+                    <div className="p-6 space-y-5 relative z-10">
+                      {/* Section 1: Route136 Brand & Student Status Header */}
+                      <div className="flex items-center justify-between pb-4 border-b border-[#222222]">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-[#ededed] flex items-center justify-center text-[#0a0a0a] shrink-0">
+                            <svg className="h-5 w-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h1 className="text-xl font-semibold tracking-tight text-white">Route136</h1>
+                              <span className="text-[10px] font-mono bg-[#141414] border border-[#262626] text-[#a1a1a1] px-2 py-0.5 rounded-full">
+                                BRACU CSE • 136 Cr
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-mono text-[#888888] mt-0.5">
+                              Academic Progress &amp; Official Degree Audit Snapshot
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold border ${
+                            cumulativeStats.cgpa >= 2.0 || cumulativeStats.completedCredits === 0
+                              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                              : 'bg-rose-500/10 border-rose-500/25 text-rose-400'
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${cumulativeStats.cgpa >= 2.0 || cumulativeStats.completedCredits === 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                            <span>{cumulativeStats.cgpa >= 3.7 ? 'HONS STANDING' : cumulativeStats.cgpa >= 2.0 || cumulativeStats.completedCredits === 0 ? 'GOOD STANDING' : 'PROBATION'}</span>
+                          </span>
+                          <p className="text-[10px] text-[#888888] font-mono mt-1">
+                            Intake: {onboardingData.startingTerm} {onboardingData.startingYear}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Section 2: 3-Column Executive Metric Strip (Combined Degree+CGPA Card, Core/MNS/Electives/Thesis Progress Card, GenEd Streams Progress Card) */}
+                      <div className="grid grid-cols-3 gap-3">
+                        {/* Card 1: Combined Degree Progress & Cumulative GPA */}
+                        <div className="p-3.5 rounded-xl bg-[#0c0c0c] border border-[#222222] flex flex-col justify-between gap-2.5">
+                          {/* Top Half: Degree Progress */}
+                          <div>
+                            <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-0.5">
+                              <span>DEGREE PROGRESS</span>
+                              <span className="text-[#0070f3] font-semibold">
+                                {((cumulativeStats.completedCredits / 136) * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold font-mono text-white">
+                                {cumulativeStats.completedCredits} <span className="text-[11px] font-normal text-[#888888]">/ 136 Cr</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-[#888888]">
+                                {Math.max(0, 136 - cumulativeStats.completedCredits)} Cr left
+                              </span>
+                            </div>
+                            <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#1f1f1f] overflow-hidden">
+                              <div
+                                style={{ width: `${Math.min(100, (cumulativeStats.completedCredits / 136) * 100)}%` }}
+                                className="h-full bg-[#0070f3] rounded-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Bottom Half: Cumulative GPA & Target Goal */}
+                          <div className="pt-2.5 border-t border-[#1d1d1d]">
+                            <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-0.5">
+                              <span>CUMULATIVE GPA</span>
+                              <span className="text-emerald-400">UGC 4.00</span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <div className="text-lg font-semibold font-mono text-white">
+                                {cumulativeStats.cgpa.toFixed(2)} <span className="text-[11px] font-normal text-[#888888]">/ 4.00</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-[#888888]">
+                                Goal: <strong className="text-[#0070f3]">{targetCgpa}</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card 2: Detailed Core, School Core (MNS), Electives & Thesis Progress Bars */}
+                        <div className="p-3.5 rounded-xl bg-[#0c0c0c] border border-[#222222] flex flex-col justify-between gap-2">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888]">
+                            <span>CORE &amp; ELECTIVES</span>
+                            <span className="text-[#ededed] font-semibold">
+                              {curriculumProgress.coreCompleted + curriculumProgress.schoolCoreCompleted + curriculumProgress.electiveCompleted + curriculumProgress.thesisCompleted} / 97 Cr
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {[
+                              { label: "Program Core", done: curriculumProgress.coreCompleted, total: 75, text: "text-blue-400", bar: "bg-[#0070f3]" },
+                              { label: "School Core (MNS)", done: curriculumProgress.schoolCoreCompleted, total: 12, text: "text-cyan-400", bar: "bg-cyan-400" },
+                              { label: "Major Electives", done: curriculumProgress.electiveCompleted, total: 6, text: "text-amber-400", bar: "bg-amber-400" },
+                              { label: "Capstone Thesis", done: curriculumProgress.thesisCompleted, total: 4, text: "text-purple-400", bar: "bg-purple-400" },
+                            ].map((cat) => (
+                              <div key={cat.label} className="space-y-0.5">
+                                <div className="flex items-center justify-between text-[10px] font-mono">
+                                  <span className={cat.text}>{cat.label}</span>
+                                  <span className="text-[#ededed]">{cat.done}/{cat.total} Cr</span>
+                                </div>
+                                <div className="h-1 w-full rounded-full bg-[#1a1a1a] overflow-hidden">
+                                  <div
+                                    style={{ width: `${Math.min(100, (cat.done / cat.total) * 100)}%` }}
+                                    className={`h-full ${cat.bar} rounded-full`}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Card 3: Detailed GenEd Streams (39 Cr) Progress Bars */}
+                        <div className="p-3.5 rounded-xl bg-[#0c0c0c] border border-[#222222] flex flex-col justify-between gap-2">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888]">
+                            <span>UNIVERSITY CORE (GENED)</span>
+                            <span className="text-[#ededed] font-semibold">
+                              {curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed + curriculumProgress.freeGenEdCredits} / 39 Cr
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5">
+                            {[
+                              { label: "S1: Writing", done: curriculumProgress.stream1Completed, total: curriculumProgress.stream1Total, text: "text-sky-400", bar: "bg-sky-400" },
+                              { label: "S2: Math/Sci", done: curriculumProgress.stream2Completed, total: curriculumProgress.stream2Total, text: "text-purple-400", bar: "bg-purple-400" },
+                              { label: "S3: Arts/Hum", done: curriculumProgress.stream3Completed, total: curriculumProgress.stream3Total, text: "text-indigo-400", bar: "bg-indigo-400" },
+                              { label: "S4: Social Sci", done: curriculumProgress.stream4Completed, total: curriculumProgress.stream4Total, text: "text-teal-400", bar: "bg-teal-400" },
+                              { label: "S5: CST", done: curriculumProgress.stream5Completed, total: curriculumProgress.stream5Total, text: "text-rose-400", bar: "bg-rose-400" },
+                              { label: "Free GenEd", done: curriculumProgress.freeGenEdCredits, total: curriculumProgress.freeGenEdTotal, text: "text-emerald-400", bar: "bg-emerald-400" },
+                            ].map((st) => (
+                              <div key={st.label} className="space-y-0.5">
+                                <div className="flex items-center justify-between text-[9px] font-mono">
+                                  <span className={`${st.text} truncate`}>{st.label}</span>
+                                  <span className="text-[#ededed]">{st.done}/{st.total}</span>
+                                </div>
+                                <div className="h-1 w-full rounded-full bg-[#1a1a1a] overflow-hidden">
+                                  <div
+                                    style={{ width: `${Math.min(100, (st.done / st.total) * 100)}%` }}
+                                    className={`h-full ${st.bar} rounded-full`}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 3: Completed Coursework Table */}
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-[11px] font-mono font-semibold tracking-wider text-[#ededed] uppercase flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                            <span>COMPLETED COURSEWORK</span>
+                          </h2>
+                          <span className="text-[10px] font-mono text-[#888888]">
+                            {semesters.length} Terms Planned
+                          </span>
+                        </div>
+                        
+                        {(() => {
+                          const exportCompletedCourses: Array<{ code: string; title: string; credits: number; grade: string; semesterName: string }> = [];
+                          
+                          semesters.forEach((sem, semIdx) => {
+                            const intake = semesterIntakes[semIdx];
+                            const semTermYear = `${sem.term || intake?.term || 'Spring'} ${sem.year || intake?.year || 2025}`;
+                            const semLabel = sem.isRS ? `RS (${semTermYear})` : `${sem.name} (${semTermYear})`;
+
+                            sem.courses.forEach(c => {
+                              if (c.code === "CSE400") return;
+                              const isComp = c.isCompleted || (c.grade !== "" && c.grade !== "F");
+                              if (isComp) {
+                                const cData = COURSES.find(co => co.code === c.code);
+                                exportCompletedCourses.push({
+                                  code: c.code,
+                                  title: cData?.title || c.code,
+                                  credits: cData?.category === "Non-Credit" ? 0 : (cData?.credits ?? 3),
+                                  grade: c.grade || "PASS",
+                                  semesterName: semLabel
+                                });
+                              }
+                            });
+                          });
+
+                          if (isCSE400Passed) {
+                            let capGrade = "PASS";
+                            for (const sem of semesters) {
+                              const found = sem.courses.find(c => c.code === "CSE400");
+                              if (found && found.grade) {
+                                capGrade = found.grade;
+                                break;
+                              }
+                            }
                             exportCompletedCourses.push({
-                              code: c.code,
-                              title: cData?.title || c.code,
-                              credits: cData?.category === "Non-Credit" ? 0 : (cData?.credits ?? 3),
-                              grade: c.grade || "-",
-                              semesterName: semLabel
+                              code: "CSE400",
+                              title: "Final Year Capstone: Thesis, Project, or Internship",
+                              credits: 4,
+                              grade: capGrade,
+                              semesterName: "Capstone Phase"
                             });
                           }
-                        });
-                      });
 
-                      if (isCSE400Passed) {
-                        let capGrade = "-";
-                        for (const sem of semesters) {
-                          const found = sem.courses.find(c => c.code === "CSE400");
-                          if (found) {
-                            capGrade = found.grade || "-";
-                            break;
+                          if (exportCompletedCourses.length === 0) {
+                            return (
+                              <div className="p-6 text-center text-[#888888] text-xs border border-[#222222] rounded-xl bg-[#0c0c0c]">
+                                No completed courses recorded yet. Mark courses as completed or assign grades to populate your transcript snapshot.
+                              </div>
+                            );
                           }
-                        }
-                        exportCompletedCourses.push({
-                          code: "CSE400",
-                          title: "Final Year Capstone: Thesis, Project, or Internship",
-                          credits: 4,
-                          grade: capGrade,
-                          semesterName: "Capstone Phase"
-                        });
-                      }
 
-                      if (exportCompletedCourses.length === 0) {
-                        return (
-                          <div className="p-6 text-center text-slate-400 text-xs italic border border-white/[0.08] rounded-2xl bg-[#08080f]">
-                            No completed courses recorded yet.
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="w-full border border-white/[0.08] rounded-2xl overflow-hidden bg-[#08080f] shadow-md">
-                          <table className="w-full text-xs text-left border-collapse">
-                            <thead>
-                              <tr className="bg-white/[0.03] border-b border-white/[0.08] text-slate-400 font-bold uppercase text-[10px] tracking-wider">
-                                <th className="py-2.5 px-3">Course</th>
-                                <th className="py-2.5 px-3">Title</th>
-                                <th className="py-2.5 px-3 text-center">Credits</th>
-                                {mode === 'gpa' && <th className="py-2.5 px-3 text-right">Grade</th>}
-                                <th className="py-2.5 px-3 text-right">Semester</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/[0.04]">
-                              {exportCompletedCourses.map((item, idx) => {
-                                const theme = getCategoryTheme(undefined, item.code);
-                                return (
-                                  <tr key={`${item.code}_${idx}`} className="hover:bg-white/[0.02]">
-                                    <td className="py-2 px-3">
-                                      <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-lg border shadow-inner ${theme.codePill}`}>
-                                        {item.code}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-3 text-slate-200 font-medium">{item.title}</td>
-                                    <td className="py-2 px-3 text-center">
-                                      <span className="font-mono text-[10px] text-slate-300 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded">
-                                        {item.credits} Cr
-                                      </span>
-                                    </td>
-                                    {mode === 'gpa' && (
-                                      <td className="py-2 px-3 font-bold font-mono text-emerald-400 text-right">
-                                        {item.grade}
-                                      </td>
-                                    )}
-                                    <td className="py-2 px-3 text-slate-400 text-right text-[11px] font-mono">{item.semesterName}</td>
+                          return (
+                            <div className="w-full border border-[#222222] rounded-xl overflow-hidden bg-[#0c0c0c]">
+                              <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-[#121212] border-b border-[#222222] text-[#888888] font-mono uppercase text-[10px] tracking-wider">
+                                    <th className="py-2.5 px-3 font-medium">Course</th>
+                                    <th className="py-2.5 px-3 font-medium">Title</th>
+                                    <th className="py-2.5 px-3 text-center font-medium">Credits</th>
+                                    <th className="py-2.5 px-3 text-right font-medium">Grade</th>
+                                    <th className="py-2.5 px-3 text-right font-medium">Semester</th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </div>
+                                </thead>
+                                <tbody className="divide-y divide-[#1a1a1a]">
+                                  {exportCompletedCourses.map((item, idx) => {
+                                    const theme = getCategoryTheme(undefined, item.code);
+                                    return (
+                                      <tr key={`${item.code}_${idx}`}>
+                                        <td className="py-2 px-3">
+                                          <span className={`font-mono font-semibold text-[11px] px-2 py-0.5 rounded border ${theme.codePill}`}>
+                                            {item.code}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 text-[#d4d4d8] font-medium">{item.title}</td>
+                                        <td className="py-2 px-3 text-center">
+                                          <span className="font-mono text-[10px] text-[#a1a1a1] bg-[#161616] border border-[#262626] px-1.5 py-0.5 rounded">
+                                            {item.credits} Cr
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 text-right">
+                                          <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded bg-[#161616] border border-[#262626] text-[#ededed]">
+                                            {item.grade}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 text-[#888888] text-right text-[11px] font-mono">{item.semesterName}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })()}
+                      </div>
 
-                  {/* Section 4: Footer Watermark (Z-Index 10) */}
-                  <div className="border-t border-white/[0.08] mt-5 pt-3.5 relative z-10 flex items-center justify-between text-[11px] text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-white font-bold">Route136</span>
-                      <span>&bull; Your curriculum, minus the complexity.</span>
+                      {/* Section 4: Footer Watermark */}
+                      <div className="border-t border-[#222222] pt-3.5 flex items-center justify-between text-[11px] text-[#888888]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#ededed] font-semibold">Route136</span>
+                          <span>•</span>
+                          <span>Your CSE curriculum, engineered for clarity.</span>
+                          <span>•</span>
+                          <span>Developed by <strong className="text-[#ededed] font-medium">Khan Abdullah</strong></span>
+                        </div>
+                        <div className="font-mono text-[10px] text-[#0070f3]">
+                          route136-cse-course-tracker.vercel.app
+                        </div>
+                      </div>
                     </div>
-                    <div className="font-mono text-[10px] text-indigo-400 font-semibold">
-                      route136-cse-course-tracker.vercel.app
-                    </div>
-                  </div>
-                </div> {/* End flow136-grade-sheet-export-node */}
+                  </div> {/* End flow136-grade-sheet-export-node */}
                 </div> {/* End inner-transform-wrapper */}
               </div> {/* End scale-wrapper */}
             </div> {/* End scrollable container */}
 
             {/* Modal Footer Controls */}
-            <div className="pt-3 border-t border-white/[0.08] flex justify-end gap-3 no-print">
+            <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex justify-end gap-2.5 no-print">
               <button
                 onClick={() => setShowGradeSheetModal(false)}
-                className="px-5 py-2.5 bg-[#050508] hover:bg-[#0e0e14] border border-white/10 rounded-2xl text-xs font-bold text-slate-200 transition cursor-pointer"
+                className="h-9 px-4 bg-[#fafafa] dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] rounded-lg text-xs font-medium text-[#171717] dark:text-[#ededed] transition cursor-pointer"
               >
                 Close Preview
               </button>
@@ -6746,14 +6846,14 @@ export default function Home() {
           !q || item.code.toLowerCase().includes(q) || item.title.toLowerCase().includes(q);
 
         const DEPT_CORE = [
-          { code: "CSE110", title: "Programming Language I", credits: 3 },
+          { code: "CSE110", alias: "CSE110 / CSE161 / EEE/ECE103", title: "Programming Language I", credits: 3 },
           { code: "CSE111", title: "Programming Language II", credits: 3 },
           { code: "CSE220", title: "Data Structures", credits: 3 },
           { code: "CSE221", title: "Algorithms", credits: 3 },
           { code: "CSE230", title: "Discrete Mathematics", credits: 3 },
           { code: "CSE250", title: "Circuits and Electronics", credits: 3 },
           { code: "CSE251", title: "Electronic Devices and Circuits", credits: 3 },
-          { code: "CSE260", title: "Digital Logic Design", credits: 3 },
+          { code: "CSE260", alias: "CSE260 / EEE/ECE283 / EEE301", title: "Digital Logic Design", credits: 3 },
           { code: "CSE320", title: "Data Communications", credits: 3 },
           { code: "CSE321", title: "Operating Systems", credits: 3 },
           { code: "CSE330", title: "Numerical Methods", credits: 3 },
@@ -6774,7 +6874,7 @@ export default function Home() {
         ];
 
         const CAPSTONE = [
-          { code: "CSE400", title: "Thesis / Internship / Final Project", credits: 4 }
+          { code: "CSE400", title: "PROJECT & THESIS (Project / Internship / Thesis)", credits: 4 }
         ];
 
         const CSE_ELECTIVES = [
@@ -6805,57 +6905,64 @@ export default function Home() {
         ];
 
         const BIL_COURSES = [
-          { code: "ENG091", title: "Foundation Course in English", credits: 0, isRemedial: true },
+          { code: "ENG091", title: "Foundation Course (0.0 Cr)", credits: 0, isRemedial: true },
           { code: "ENG101", title: "English Fundamentals", credits: 3, isRemedial: false },
           { code: "ENG102", title: "English Composition I", credits: 3, isRemedial: false },
-          { code: "ENG103", title: "English Composition II", credits: 3, isRemedial: false }
+          { code: "ENG103", title: "Advanced Writing Skills and Presentation* (*Only for ENG102 freshers)", credits: 3, isRemedial: false }
         ];
 
-        const MNS_COURSES = [
-          { code: "MAT092", title: "Intermediate Course in Mathematics", credits: 0, isRemedial: true },
-          { code: "MAT110", title: "Math I: Differential Calculus & Geometry", credits: 3, isRemedial: false },
-          { code: "PHY111", title: "Principles of Physics I", credits: 3, isRemedial: false },
-          { code: "STA201", title: "Elements of Statistics and Probability", credits: 3, isRemedial: false },
-          { code: "MAT120", title: "Math II: Integral Calculus & Differential Eq.", credits: 3, isRemedial: false },
-          { code: "MAT215", title: "Math III: Complex Variables & Laplace", credits: 3, isRemedial: false },
-          { code: "MAT216", title: "Math IV: Linear Algebra & Fourier Analysis", credits: 3, isRemedial: false },
+        const SCHOOL_CORE_MNS = [
+          { code: "MAT120", title: "MATH II: Integral Calculus and Differential Equations", credits: 3, isRemedial: false },
+          { code: "MAT215", title: "MATH III: Complex Variables and Laplace Transformations", credits: 3, isRemedial: false },
+          { code: "MAT216", title: "MATH IV: Linear Algebra and Fourier Analysis", credits: 3, isRemedial: false },
           { code: "PHY112", title: "Principles of Physics II", credits: 3, isRemedial: false }
         ];
 
+        const STREAM2_MNS = [
+          { code: "MAT092", title: "Remedial Course in Mathematics (0.0 Cr)", credits: 0, isRemedial: true },
+          { code: "MAT110", title: "MATH I: Differential Calculus and Co-ordinate Geometry", credits: 3, isRemedial: false },
+          { code: "PHY111", title: "Principles of Physics I", credits: 3, isRemedial: false },
+          { code: "STA201", title: "Elements of Statistics and Probability", credits: 3, isRemedial: false }
+        ];
+
         const TARC_COURSES = [
-          { code: "HUM103", title: "Ethics and Culture", credits: 3 },
-          { code: "BNG103", title: "Bangla Bhasha o Shahitto", credits: 3 },
-          { code: "EMB101", title: "Emergence of Bangladesh", credits: 3 }
+          { code: "HUM103", title: "Ethics and Culture (Stream 3 Mandatory)", credits: 3 },
+          { code: "BNG103", title: "Bangla Language and Literature (Stream 3 Mandatory)", credits: 3 },
+          { code: "EMB101", title: "Emergence of Bangladesh / DEV101 Bangladesh Studies (Stream 4 Mandatory)", credits: 3 }
         ];
 
         const GENED_STREAMS = [
           {
             stream: "Stream 2",
-            title: "Math & Natural Sciences",
-            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
-            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
-            courses: ["BIO101","CHE101","ENV103","GSC110","MAT101","PHY101","STA101"]
+            title: "Math & Natural Sciences (Optional Pool)",
+            rule: "Mandatory: MAT110, PHY111, STA201 (9 Cr) • Optional Electives below:",
+            badge: "bg-purple-500/15 border-purple-500/30 text-purple-600 dark:text-purple-300",
+            pill: "bg-purple-500/10 border-purple-500/25 text-purple-700 dark:text-purple-200 hover:bg-purple-500/20 hover:border-purple-500/50",
+            courses: ["CHE101","BIO101","ENV103","GSC110"]
           },
           {
             stream: "Stream 3",
-            title: "Arts & Humanities",
-            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
-            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
-            courses: ["ENG110","ENG113","ENG114","ENG115","ENG333","HST102","HST103","HST104","HUM101","HUM102","HUM207","HUM210","HUM301"]
+            title: "Arts & Humanities (Minimum 1 Elective)",
+            rule: "Mandatory: HUM103, BNG103 (6 Cr) • Minimum 1 course (3 Cr) from:",
+            badge: "bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-300",
+            pill: "bg-sky-500/10 border-sky-500/25 text-sky-700 dark:text-sky-200 hover:bg-sky-500/20 hover:border-sky-500/50",
+            courses: ["HUM101","HUM102","HST102","HST103","HST104","HUM207","ENG110","ENG113","ENG114","ENG115","ENG333","HUM104","HUM110","HUM201","HUM210","HUM301"]
           },
           {
             stream: "Stream 4",
-            title: "Social Sciences",
-            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
-            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
-            courses: ["ANT101","ANT342","ANT351","BUS102","BUS201","BUS333","BUS335","BU201","DEV104","DEV201","ECO101","ECO102","ECO105","POL101","POL102","POL103","POL201","POL202","POL203","POL210","PSY101","PSY102","SOC101","SOC201"]
+            title: "Social Sciences (Minimum 1 Elective)",
+            rule: "Mandatory: EMB101 / DEV101 (3 Cr) • Minimum 1 course (3 Cr) from:",
+            badge: "bg-teal-500/15 border-teal-500/30 text-teal-600 dark:text-teal-300",
+            pill: "bg-teal-500/10 border-teal-500/25 text-teal-700 dark:text-teal-200 hover:bg-teal-500/20 hover:border-teal-500/50",
+            courses: ["PSY101","SOC101","ANT101","POL101","BUS201","BU201","ECO101","ECO102","ECO105","BUS102","POL102","POL103","POL201","POL202","POL203","POL210","PSY102","DEV104","DEV201","SOC201","ANT342","ANT351","BUS333","BUS335"]
           },
           {
             stream: "Stream 5",
-            title: "Communities (CST)",
-            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
-            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
-            courses: ["BUS334","CST201","CST204","CST301","CST302","CST303","CST304","CST305","CST306","CST307","CST308","CST309","CST310","CST314","CST333"]
+            title: "Communities, Seeking Transformation (Minimum 1)",
+            rule: "Minimum 1 course (3 Cr) from:",
+            badge: "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-300",
+            pill: "bg-rose-500/10 border-rose-500/25 text-rose-700 dark:text-rose-200 hover:bg-rose-500/20 hover:border-rose-500/50",
+            courses: ["CST201","CST204","CST301","CST302","CST303","CST304","CST305","CST306","CST307","CST308","CST309","CST310","CST314","CST333","BUS334"]
           }
         ];
 
@@ -6863,7 +6970,8 @@ export default function Home() {
         const filteredCapstone = CAPSTONE.filter(matchCourse);
         const filteredElectives = CSE_ELECTIVES.filter(matchCourse);
         const filteredBil = BIL_COURSES.filter(matchCourse);
-        const filteredMns = MNS_COURSES.filter(matchCourse);
+        const filteredSchoolCoreMns = SCHOOL_CORE_MNS.filter(matchCourse);
+        const filteredStream2Mns = STREAM2_MNS.filter(matchCourse);
         const filteredTarc = TARC_COURSES.filter(matchCourse);
 
         const showDept = roadmapActiveTab === 'all' || roadmapActiveTab === 'dept';
@@ -6872,10 +6980,25 @@ export default function Home() {
 
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
-            <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl max-w-[96vw] md:max-w-6xl w-full max-h-[94vh] flex flex-col shadow-vercel-modal relative overflow-hidden text-xs md:text-sm text-[#171717] dark:text-[#ededed]">
-              
+            <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl max-w-[96vw] md:max-w-6xl w-full max-h-[94vh] flex flex-col shadow-vercel-modal relative overflow-hidden text-xs md:text-sm text-[#171717] dark:text-[#ededed]">
+              {/* Window Chrome Bar */}
+              <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                </div>
+                <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                  <span>route136.app/curriculum-roadmap</span>
+                </div>
+                <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                  136 CR GUIDE
+                </span>
+              </div>
+
               {/* Header */}
-              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 relative z-10 shrink-0 bg-[#fafafa] dark:bg-[#111111]">
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 relative z-10 shrink-0 bg-white dark:bg-[#0c0c0c]">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="h-9 w-9 rounded-lg border border-[#e5e5e5] dark:border-[#2a2a2a] bg-white dark:bg-[#181818] flex items-center justify-center text-[#0070f3] shrink-0">
                     <Compass className="h-4.5 w-4.5" />
@@ -6981,20 +7104,20 @@ export default function Home() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                     {[
-                      { label: "Dept Core", count: "25 Courses", cr: "75 Credits" },
-                      { label: "Electives", count: "2 Courses", cr: "6 Credits" },
-                      { label: "Capstone", count: "1 Course", cr: "4 Credits" },
-                      { label: "MNS", count: "7 Courses", cr: "21 Credits" },
-                      { label: "GenEd", count: "5 Courses", cr: "15 Credits" },
-                      { label: "TARC (RS)", count: "3 Courses", cr: "9 Credits" },
-                      { label: "BIL (English)", count: "2 Courses", cr: "6 Credits" },
+                      { label: "Dept Core", count: "25 Courses", cr: "75 Credits", box: "bg-blue-500/10 border-blue-500/30", text: "text-blue-600 dark:text-blue-300" },
+                      { label: "Electives", count: "2 Courses", cr: "6 Credits", box: "bg-amber-500/10 border-amber-500/30", text: "text-amber-600 dark:text-amber-300" },
+                      { label: "Capstone", count: "1 Course", cr: "4 Credits", box: "bg-purple-500/10 border-purple-500/30", text: "text-purple-600 dark:text-purple-300" },
+                      { label: "MNS", count: "7 Courses", cr: "21 Credits", box: "bg-cyan-500/10 border-cyan-500/30", text: "text-cyan-600 dark:text-cyan-300" },
+                      { label: "GenEd", count: "5 Courses", cr: "15 Credits", box: "bg-rose-500/10 border-rose-500/30", text: "text-rose-600 dark:text-rose-300" },
+                      { label: "TARC (RS)", count: "3 Courses", cr: "9 Credits", box: "bg-indigo-500/10 border-indigo-500/30", text: "text-indigo-600 dark:text-indigo-300" },
+                      { label: "BIL (English)", count: "2 Courses", cr: "6 Credits", box: "bg-sky-500/10 border-sky-500/30", text: "text-sky-600 dark:text-sky-300" },
                     ].map((stat, idx) => (
-                      <div key={stat.label} className={`${idx === 6 ? "col-span-2 sm:col-span-1" : ""} p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] flex flex-col items-center text-center`}>
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#666666] dark:text-[#888888]">
+                      <div key={stat.label} className={`${idx === 6 ? "col-span-2 sm:col-span-1" : ""} p-2.5 rounded-lg border flex flex-col items-center text-center ${stat.box}`}>
+                        <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider ${stat.text}`}>
                           {stat.label}
                         </span>
                         <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed] mt-1">{stat.count}</span>
-                        <span className="text-[10px] text-[#888888] font-mono">{stat.cr}</span>
+                        <span className="text-[10px] text-[#666666] dark:text-[#a1a1a1] font-mono">{stat.cr}</span>
                       </div>
                     ))}
                   </div>
@@ -7003,31 +7126,41 @@ export default function Home() {
                 {/* Section 1: Department Core (Program Core + Capstone) */}
                 {showDept && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-blue-500/20">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                        <span className="text-[10px] font-mono font-semibold text-blue-600 dark:text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                           Program Core
                         </span>
                         <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">25 Mandatory Computing Courses</h4>
                       </div>
-                      <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">75 Credits Total</span>
+                      <span className="text-xs text-blue-600 dark:text-blue-300 font-mono shrink-0">75 Credits Total</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {filteredDeptCore.map((c) => (
                         <div 
                           key={c.code}
-                          className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all flex items-center justify-between gap-2.5"
+                          className="p-2.5 rounded-lg bg-blue-500/5 dark:bg-blue-500/[0.06] border border-blue-500/20 hover:border-blue-500/45 transition-all flex items-center justify-between gap-2.5"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
+                            <span
+                              title={(c as any).alias || c.code}
+                              className="font-mono font-semibold text-xs text-blue-600 dark:text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded shrink-0"
+                            >
                               {c.code}
                             </span>
-                            <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
-                              {c.title}
-                            </span>
+                            <div className="min-w-0">
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate block">
+                                {c.title}
+                              </span>
+                              {(c as any).alias && (
+                                <span className="text-[10px] font-mono text-blue-600/80 dark:text-blue-300/80 truncate block">
+                                  Alt: {(c as any).alias}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-[10px] font-mono text-[#888888] shrink-0">
+                          <span className="text-[10px] font-mono text-blue-600/80 dark:text-blue-300/80 shrink-0">
                             {c.credits} Cr
                           </span>
                         </div>
@@ -7036,31 +7169,31 @@ export default function Home() {
 
                     {/* Capstone */}
                     <div className="pt-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-purple-500/20">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             Capstone
                           </span>
                           <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">Graduation Milestone</h4>
                         </div>
-                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">4 Credits</span>
+                        <span className="text-xs text-purple-600 dark:text-purple-300 font-mono shrink-0">4 Credits</span>
                       </div>
 
                       <div className="mt-2">
                         {filteredCapstone.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-3"
+                            className="p-3 rounded-lg bg-purple-500/5 dark:bg-purple-500/[0.06] border border-purple-500/25 flex items-center justify-between gap-3"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-semibold text-xs text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded shrink-0">
+                              <span className="font-mono font-semibold text-xs text-purple-600 dark:text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
                               <span className="text-xs font-medium text-[#171717] dark:text-[#ededed] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[11px] font-mono text-[#666666] dark:text-[#888888] shrink-0">
+                            <span className="text-[11px] font-mono text-purple-600 dark:text-purple-300 shrink-0">
                               4 Credits
                             </span>
                           </div>
@@ -7068,35 +7201,35 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* CSE Major Electives */}
+                    {/* Program Electives (Official Degree Plan Note: Min 1 CSE, others maybe COD/GenEd/Minor/2nd Major) */}
                     <div className="pt-2 space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-amber-500/20">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            CSE Major Electives
+                          <span className="text-[10px] font-mono font-semibold text-amber-600 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            Program Elective (6 Cr)
                           </span>
                           <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
-                            Select 2 Courses <span className="text-[#888888] font-normal text-xs">(from 24 Available)</span>
+                            Select 2 Courses <span className="text-[#888888] font-normal text-xs">(Min 1 CSE; 2nd may be CSE, COD/GenEd, Minor, or 2nd Major)</span>
                           </h4>
                         </div>
-                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">6 Credits Required</span>
+                        <span className="text-xs text-amber-600 dark:text-amber-300 font-mono shrink-0">6 Credits Required</span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {filteredElectives.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all flex items-center justify-between gap-2.5"
+                            className="p-2.5 rounded-lg bg-amber-500/5 dark:bg-amber-500/[0.06] border border-amber-500/20 hover:border-amber-500/45 transition-all flex items-center justify-between gap-2.5"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
+                              <span className="font-mono font-semibold text-xs text-amber-600 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[10px] font-mono text-[#888888] shrink-0">
+                            <span className="text-[10px] font-mono text-amber-600/80 dark:text-amber-300/80 shrink-0">
                               {c.credits} Cr
                             </span>
                           </div>
@@ -7106,44 +7239,80 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Section 2: Outside Department (MNS, BIL, RS) */}
+                {/* Section 2: Outside Department (School Core, Stream 2 MNS, Stream 1 BIL, RS) */}
                 {showOutside && (
                   <div className="space-y-5">
-                    {/* MNS Math & Natural Sciences */}
+                    {/* School Core (12 Cr) */}
                     <div className="space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-cyan-500/20">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            MNS
+                          <span className="text-[10px] font-mono font-semibold text-cyan-600 dark:text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            School Core
                           </span>
                           <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
-                            Mathematics &amp; Natural Sciences <span className="text-[#888888] font-normal text-xs">(7 Courses)</span>
+                            Mandatory Mathematics &amp; Physics <span className="text-[#888888] font-normal text-xs">(4 Courses)</span>
                           </h4>
                         </div>
-                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">21 Academic Credits</span>
+                        <span className="text-xs text-cyan-600 dark:text-cyan-300 font-mono shrink-0">12 Credits</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {filteredMns.map((c) => (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        {filteredSchoolCoreMns.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
+                            className="p-2.5 rounded-lg bg-cyan-500/5 dark:bg-cyan-500/[0.06] border border-cyan-500/20 hover:border-cyan-500/45 transition-all flex items-center justify-between gap-2.5"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
+                              <span className="font-mono font-semibold text-xs text-cyan-600 dark:text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate">
+                                {c.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-cyan-600/80 dark:text-cyan-300/80 shrink-0">
+                              {c.credits} Cr
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Stream 2 Mandatory MNS (9 Cr + Remedial MAT092) */}
+                    <div className="space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-purple-500/20">
+                        <div className="flex flex-wrap items-center gap-2 min-w-0">
+                          <span className="text-[10px] font-mono font-semibold text-purple-600 dark:text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            Stream 2: Math &amp; Natural Sciences
+                          </span>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                            University Core Mandatory MNS <span className="text-[#888888] font-normal text-xs">(3 Courses + Optional Remedial MAT092)</span>
+                          </h4>
+                        </div>
+                        <span className="text-xs text-purple-600 dark:text-purple-300 font-mono shrink-0">9 Credits</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        {filteredStream2Mns.map((c) => (
+                          <div 
+                            key={c.code}
+                            className="p-2.5 rounded-lg bg-purple-500/5 dark:bg-purple-500/[0.06] border border-purple-500/20 hover:border-purple-500/45 transition-all flex items-center justify-between gap-2.5"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-semibold text-xs text-purple-600 dark:text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 rounded shrink-0">
+                                {c.code}
+                              </span>
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate">
                                 {c.title}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {c.isRemedial && (
                                 <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded uppercase">
-                                  Non-Credit
+                                  0.0 Cr
                                 </span>
                               )}
-                              <span className="text-[10px] font-mono text-[#888888]">
+                              <span className="text-[10px] font-mono text-purple-600/80 dark:text-purple-300/80">
                                 {c.credits} Cr
                               </span>
                             </div>
@@ -7152,41 +7321,41 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* BIL Languages */}
+                    {/* Stream 1: Writing Comprehension (BIL Languages - 6 Cr) */}
                     <div className="space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-sky-500/20">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            BIL
+                          <span className="text-[10px] font-mono font-semibold text-sky-600 dark:text-sky-300 bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            Stream 1: Writing Comprehension (BIL)
                           </span>
                           <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
-                            Brac Institute of Languages <span className="text-[#888888] font-normal text-xs">(2 Courses Needed)</span>
+                            2 Credit Courses Required <span className="text-[#888888] font-normal text-xs">(ENG101+ENG102, or ENG102+ENG103* for ENG102 freshers)</span>
                           </h4>
                         </div>
-                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">6 Academic Credits</span>
+                        <span className="text-xs text-sky-600 dark:text-sky-300 font-mono shrink-0">6 Credits</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {filteredBil.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
+                            className="p-2.5 rounded-lg bg-sky-500/5 dark:bg-sky-500/[0.06] border border-sky-500/20 hover:border-sky-500/45 transition-all flex items-center justify-between gap-2.5"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
+                              <span className="font-mono font-semibold text-xs text-sky-600 dark:text-sky-300 bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate">
                                 {c.title}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {c.isRemedial && (
                                 <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded uppercase">
-                                  Non-Credit
+                                  0.0 Cr
                                 </span>
                               )}
-                              <span className="text-[10px] font-mono text-[#888888]">
+                              <span className="text-[10px] font-mono text-sky-600/80 dark:text-sky-300/80">
                                 {c.credits} Cr
                               </span>
                             </div>
@@ -7197,33 +7366,33 @@ export default function Home() {
 
                     {/* TARC Residential Semester */}
                     <div className="space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-indigo-500/20">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            TARC (RS)
+                          <span className="text-[10px] font-mono font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            TARC (RS) • Stream 3 &amp; 4 Mandatory
                           </span>
                           <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
-                            Residential Semester <span className="text-[#888888] font-normal text-xs">(3 Courses Mandatory)</span>
+                            Residential Semester Core <span className="text-[#888888] font-normal text-xs">(HUM103, BNG103, EMB101 / DEV101)</span>
                           </h4>
                         </div>
-                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">9 Academic Credits</span>
+                        <span className="text-xs text-indigo-600 dark:text-indigo-300 font-mono shrink-0">9 Credits</span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {filteredTarc.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
+                            className="p-2.5 rounded-lg bg-indigo-500/5 dark:bg-indigo-500/[0.06] border border-indigo-500/20 hover:border-indigo-500/45 transition-all flex items-center justify-between gap-2.5"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
+                              <span className="font-mono font-semibold text-xs text-indigo-600 dark:text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
+                              <span className="text-xs text-[#333333] dark:text-[#d4d4d8] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[10px] font-mono text-[#888888] shrink-0">
+                            <span className="text-[10px] font-mono text-indigo-600/80 dark:text-indigo-300/80 shrink-0">
                               {c.credits} Cr
                             </span>
                           </div>
@@ -7233,37 +7402,52 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Section 3: COD GenEd Electives */}
+                {/* Section 3: University Core (General Education Streams & 2 Free GenEd Electives) */}
                 {showGened && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-rose-500/20">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                          COD
+                        <span className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                          University Core (GenEd)
                         </span>
                         <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
-                          General Education Streams <span className="text-[#888888] font-normal text-xs">(5 Courses Required)</span>
+                          Streams 2–5 Electives + 2 Free GenEd Electives <span className="text-[#888888] font-normal text-xs">(15 Cr Electives + 24 Cr Mandatory = 39 Cr Total)</span>
                         </h4>
                       </div>
-                      <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">15 Academic Credits</span>
+                      <span className="text-xs text-rose-600 dark:text-rose-300 font-mono shrink-0">39 Total GenEd Credits</span>
+                    </div>
+
+                    {/* Official GenEd Electives Rule Callout from Updated_Degree_Plan_CSE.docx.pdf */}
+                    <div className="p-3.5 rounded-xl bg-rose-500/[0.05] dark:bg-rose-500/[0.08] border border-rose-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-xs text-[#333333] dark:text-[#d4d4d8] leading-relaxed">
+                        <strong className="text-rose-600 dark:text-rose-300 font-semibold">GenEd Electives Rule (6 Credits / 2 Courses):</strong>{" "}
+                        After completing the minimum requirements (11 courses: 2 in Stream 1, 3 in Stream 2, 3 in Stream 3, 2 in Stream 4, 1 in Stream 5), students take <strong>2 additional GenEd elective courses</strong> as per their desire from Streams 2, 3, 4, and 5 or any elective courses outside the CSE department.
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {GENED_STREAMS.map((st) => (
                         <div 
                           key={st.stream}
-                          className="p-4 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] space-y-3"
+                          className="p-4 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] space-y-2.5"
                         >
-                          <div className="flex items-center justify-between gap-2 border-b border-[#ebebeb] dark:border-[#222222] pb-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${st.badge}`}>
-                                {st.stream}
+                          <div className="border-b border-[#ebebeb] dark:border-[#222222] pb-2 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${st.badge}`}>
+                                  {st.stream}
+                                </span>
+                                <h5 className="font-semibold text-xs text-[#171717] dark:text-[#ededed]">{st.title}</h5>
+                              </div>
+                              <span className="text-[10px] text-[#888888] font-mono shrink-0">
+                                {st.courses.length} options
                               </span>
-                              <h5 className="font-semibold text-xs text-[#171717] dark:text-[#ededed]">{st.title}</h5>
                             </div>
-                            <span className="text-[10px] text-[#888888] font-mono">
-                              {st.courses.length} options
-                            </span>
+                            {(st as any).rule && (
+                              <p className="text-[11px] text-[#666666] dark:text-[#888888] font-mono">
+                                {(st as any).rule}
+                              </p>
+                            )}
                           </div>
                           
                           <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
@@ -7342,11 +7526,18 @@ export default function Home() {
 
               </div>
 
-              {/* Modal Footer with Attribution */}
-              <div className="px-4 sm:px-6 py-3 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-[#666666] dark:text-[#888888] shrink-0 relative z-10 text-center md:text-left">
-                <span className="font-mono">
-                  136 Cr Total = 75 Core + 6 Electives + 4 Thesis + 21 MNS + 15 GenEd + 9 RS + 6 BIL
-                </span>
+              {/* Modal Footer with Colored Category Guide & Attribution */}
+              <div className="px-4 sm:px-6 py-3 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex flex-col lg:flex-row items-center justify-between gap-2 text-[11px] text-[#666666] dark:text-[#888888] shrink-0 relative z-10 text-center lg:text-left">
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 font-mono text-[10px]">
+                  <span className="font-semibold text-[#171717] dark:text-[#ededed]">136 Cr:</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/25 text-blue-600 dark:text-blue-300">75 Core</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-300">6 Electives</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/25 text-purple-600 dark:text-purple-300">4 Thesis</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/25 text-cyan-600 dark:text-cyan-300">21 MNS</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-300">15 GenEd</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/25 text-indigo-600 dark:text-indigo-300">9 RS</span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/25 text-sky-600 dark:text-sky-300">6 BIL</span>
+                </div>
                 <div>
                   Curriculum Guideline by <strong className="text-[#171717] dark:text-[#ededed] font-medium">Badhon Nandi</strong> (FYAT Mentor), OAA Brac University
                 </div>
@@ -7360,9 +7551,25 @@ export default function Home() {
       {/* Repeat ROI Analyzer Dedicated Popup Modal */}
       {showRoiModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-6">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-2xl overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150 text-[#171717] dark:text-[#ededed]">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-2xl overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150 text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/retake-roi</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                SIMULATOR
+              </span>
+            </div>
+
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-white dark:bg-[#0c0c0c]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
                   <Repeat className="h-4.5 w-4.5" />
@@ -7687,9 +7894,25 @@ export default function Home() {
       {/* Official Grading System Reference Modal */}
       {showGradingSystemModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[90vh] text-[#171717] dark:text-[#ededed]">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[90vh] text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/grading-scale</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                UGC 4.00
+              </span>
+            </div>
+
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-white dark:bg-[#0c0c0c]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3]">
                   <Award className="h-4.5 w-4.5" />
@@ -7758,9 +7981,25 @@ export default function Home() {
       {/* Cloud Sync & Auth Gatekeeper Modal */}
       {showCloudModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] relative text-[#171717] dark:text-[#ededed]">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] relative text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>route136.app/cloud-sync</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                G-SUITE
+              </span>
+            </div>
+
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-white dark:bg-[#0c0c0c]">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
                   <Cloud className="h-4.5 w-4.5" />
@@ -8019,52 +8258,70 @@ export default function Home() {
 
       {/* Cloud Remote Conflict / Initial Found Modal */}
       {showCloudConflictModal && cloudConflictPayload && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-md shadow-vercel-modal p-5 sm:p-6 space-y-4 relative text-[#171717] dark:text-[#ededed]">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
-                <Cloud className="h-4.5 w-4.5" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl w-full max-w-md shadow-vercel-modal overflow-hidden relative text-[#171717] dark:text-[#ededed]">
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
               </div>
-              <div>
-                <h4 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed]">Cloud Curriculum Found</h4>
-                <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5">Existing backup on Google Drive</p>
+              <div className="px-2.5 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/cloud-restore</span>
               </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                SYNC
+              </span>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] text-xs space-y-2.5 text-[#4d4d4d] dark:text-[#a1a1a1]">
-              <p>
-                An existing Route136 curriculum backup was found on your Google Drive:
-              </p>
-              <div className="text-[11px] font-mono text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#181818] border border-[#ebebeb] dark:border-[#262626] p-2.5 rounded-lg space-y-1">
-                <div>Backup Date: <strong>{formatSyncTimestamp(cloudConflictPayload.updatedAt)}</strong></div>
-                <div>Semesters: <strong>{cloudConflictPayload.semesters?.length ?? 0} semesters planned</strong></div>
-                {cloudConflictPayload.statsSummary && (
-                  <div>Credits: <strong>{cloudConflictPayload.statsSummary.completedCredits} completed</strong></div>
-                )}
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Cloud className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed]">Cloud Curriculum Found</h4>
+                  <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5">Existing backup on Google Drive</p>
+                </div>
               </div>
-              <p className="text-[11px] text-[#666666] dark:text-[#888888]">
-                Would you like to restore this cloud plan, or overwrite it with your current local plan?
-              </p>
-            </div>
 
-            <div className="flex gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCloudConflictModal(false);
-                  performCloudSync();
-                }}
-                className="flex-1 h-9 bg-[#fafafa] dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
-              >
-                Keep Local Plan
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRestoreFromCloud()}
-                className="flex-1 h-9 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
-              >
-                Restore Cloud Plan
-              </button>
+              <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] text-xs space-y-2.5 text-[#4d4d4d] dark:text-[#a1a1a1]">
+                <p>
+                  An existing Route136 curriculum backup was found on your Google Drive:
+                </p>
+                <div className="text-[11px] font-mono text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#181818] border border-[#ebebeb] dark:border-[#262626] p-2.5 rounded-lg space-y-1">
+                  <div>Backup Date: <strong>{formatSyncTimestamp(cloudConflictPayload.updatedAt)}</strong></div>
+                  <div>Semesters: <strong>{cloudConflictPayload.semesters?.length ?? 0} semesters planned</strong></div>
+                  {cloudConflictPayload.statsSummary && (
+                    <div>Credits: <strong>{cloudConflictPayload.statsSummary.completedCredits} completed</strong></div>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#666666] dark:text-[#888888]">
+                  Would you like to restore this cloud plan, or overwrite it with your current local plan?
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCloudConflictModal(false);
+                    performCloudSync();
+                  }}
+                  className="flex-1 h-9 bg-[#fafafa] dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
+                >
+                  Keep Local Plan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRestoreFromCloud()}
+                  className="flex-1 h-9 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
+                >
+                  Restore Cloud Plan
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -8080,25 +8337,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* Desktop SpeedDial Floating (+) Action Button (bottom right) */}
-      {isOnboarded && (
-        <SpeedDialMenu
-          onAddSemester={handleTriggerAddSemester}
-          onAddCourses={() => setIsAddCoursesModalOpen(true)}
-          onQuickGrades={() => {
-            setQuickGradesInitialSemIdx(0);
-            setIsQuickGradesModalOpen(true);
-          }}
-          isCgpaMode={mode === 'gpa'}
-        />
-      )}
-
       {/* Mobile Floating Action Sheet (when (+) tapped on mobile nav) */}
       {isOnboarded && (
         <SpeedDialMenu
           onAddSemester={handleTriggerAddSemester}
           onAddCourses={() => {
             setAddCoursesPreselected([]);
+            setAddCoursesTargetSemesterId(null);
             setIsAddCoursesModalOpen(true);
           }}
           onQuickGrades={() => {
@@ -8136,6 +8381,7 @@ export default function Home() {
           }}
           onOpenAddCourses={() => {
             setAddCoursesPreselected([]);
+            setAddCoursesTargetSemesterId(null);
             setIsAddCoursesModalOpen(true);
           }}
           onOpenTools={() => setIsExtraSidebarOpen(true)}
@@ -8163,9 +8409,11 @@ export default function Home() {
         onClose={() => {
           setIsAddCoursesModalOpen(false);
           setAddCoursesPreselected([]);
+          setAddCoursesTargetSemesterId(null);
         }}
-        semesters={semesters}
+        semesters={!isOnboarded ? semesters.slice(0, onboardingData.currentSemesterNumber || 1) : semesters}
         initialSelectedCodes={addCoursesPreselected}
+        initialTargetSemesterId={addCoursesTargetSemesterId}
         onCommitAddCourses={handleCommitAddCourses}
         onRemoveCourseFromSemester={(semId, courseCode) => handleRemoveCourse(semId, courseCode)}
         onClearSemesterCourses={handleClearSemesterCourses}
@@ -8178,6 +8426,20 @@ export default function Home() {
         semesters={semesters}
         initialSemesterIdx={quickGradesInitialSemIdx}
         onUpdateGrade={(semId, courseCode, grade) => handleGradeChange(semId, courseCode, grade)}
+      />
+
+      {/* CSE & MNS Prerequisite Sequence Chains Modal */}
+      <PrereqChainsModal
+        isOpen={showPrereqChainsModal}
+        onClose={() => setShowPrereqChainsModal(false)}
+        semesters={semesters}
+        isCSE400Passed={isCSE400Passed}
+        onQuickAddCourse={(courseCode) => {
+          setShowPrereqChainsModal(false);
+          setAddCoursesPreselected([courseCode]);
+          setAddCoursesTargetSemesterId(null);
+          setIsAddCoursesModalOpen(true);
+        }}
       />
     </div>
   );

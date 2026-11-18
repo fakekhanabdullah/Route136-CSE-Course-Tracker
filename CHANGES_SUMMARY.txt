@@ -1,0 +1,135 @@
+================================================================================
+ROUTE136 — WHAT WAS UPDATED & HOW IT WAS BEFORE (CHANGE SUMMARY)
+================================================================================
+
+1. SETUP WIZARD OVERHAUL: TIMELINE FIRST, FLEXIBLE RS & LANDING PAGE AESTHETIC
+--------------------------------------------------------------------------------
+- BEFORE:
+  * Step 1 asked for 1st Semester Entry Pathway first, while Current Semester,
+    Starting Intake, and RS were buried in Step 2.
+  * "When do you attend RS?" only offered 3 fixed buttons (3rd, 4th, 5th Sem)
+    with no way to enter another semester number or choose "Not Sure Yet".
+  * Step 2 also showed a confusing 4-case "Stream 1 Status Prior to RS" module.
+- NOW:
+  * Redesigned the Setup Wizard to match the Landing Page Vercel Developer
+    Platform aesthetic (36px structural grid, radial blue spotlight, macOS
+    window chrome header `route136.app/setup`, and 3-column step indicator pills).
+  * Step 1 (First Popup) is now "Current Semester, Intake & RS":
+      - Select Current Semester (1st – 12th Semester), Starting Term, and Year.
+      - "When do you attend RS?" includes quick presets (3rd, 4th, 5th, or
+        "Not Sure Yet") PLUS a custom semester number dropdown (2nd – 12th
+        Semester or "Not Sure / Decide Later").
+      - Removed the confusing "Stream 1 Status Prior to RS" module entirely.
+  * Step 2 is a clean 2-card "1st Semester Starting Pathway" selector with
+    `GraduationCap` (Direct Credit) and `Compass` (Non-Credit Foundation) icons.
+  * Step 3 is an interactive "Populate Your Semesters (1st -> Current)" screen:
+      - If you have reached or completed your RS semester, the RS card is
+        pre-populated with EMB101, HUM103, and BNG103, and offers inline buttons
+        right on the RS card to choose "+ ENG102" or "+ BU201" as your 4th RS
+        course.
+      - Removed the legacy `useEffect` that overwrote `BU201` back to `ENG102`.
+
+2. MULTI-SEMESTER ADD COURSES + IN-BATCH RETAKE / REPEAT COURSE PROMPT
+--------------------------------------------------------------------------------
+- BEFORE:
+  * Adding courses to multiple semesters required reopening the modal or
+    changing dropdowns row by row, and you could not queue a repeated course
+    across two different semesters in a single session.
+- NOW:
+  * Redesigned `AddCoursesModal.tsx` with a **Horizontal Multi-Semester Tab
+    Switcher** (`Sem 1`, `Sem 2`, `RS`, `Sem 4`, etc.).
+  * **Repeat Course in One Go**: If you select a course in one semester tab and
+    then switch to another semester tab and click that same course again (or
+    click a course already enrolled in an earlier semester), an inline prompt
+    asks: *"Repeat [CODE] in [Semester]? Do you want to repeat (retake) it or
+    move it?"* Clicking **"Yes, Repeat Course"** queues the second attempt with
+    a `RETAKE` badge in the same session!
+
+3. NEW "PRE-REQ CHAIN" SEQUENCE VIEWER (`PrereqChainsModal.tsx`)
+--------------------------------------------------------------------------------
+- BEFORE:
+  * There was no dedicated visual page showing all CSE & MNS prerequisite
+    chains and how many courses remained in each chain.
+- NOW:
+  * Added `/flow charts and updated degree plan/` to `.gitignore`.
+  * Built `PrereqChainsModal.tsx`, accessible from the left sidebar under
+    Utilities (**`Pre-req Chain`**) and the top workspace bar:
+      1) **Programming, Algorithms & Systems Backbone** (`CSE110` -> `CSE111` ->
+         `CSE220` -> `CSE221` -> `CSE321/370/331/422` -> `CSE420/470/471` -> `CSE400`)
+      2) **MNS Calculus, Linear Algebra & Applied Computing Chain** (`MAT110` ->
+         `MAT120` -> `MAT216` -> `MAT215 / CSE330 / CSE423`)
+      3) **Physics, Electronics, Architecture & Robotics Chain** (`PHY111` ->
+         `PHY112` -> `CSE250` -> `CSE251` -> `CSE260/350` -> `CSE340/460/461` ->
+         `CSE341` -> `CSE360`)
+      4) **Data Communications & Computer Networks Chain** (`CSE320` -> `CSE421`)
+      5) **BIL English & Technical Communication Chain** (`ENG101` -> `ENG102`)
+      6) **CSE Major Elective Prerequisite Gates** (all 23 gated electives)
+  * Each chain displays a live **"X / Y Completed • Z Left (N%)"** progress bar,
+    highlights **"Ready Next"** unlocked courses, shows Hard (`HP`) & Soft (`SP`)
+    prerequisites on every node, and includes an interactive **Course Dependency
+    Inspector** when you click any course box.
+
+4. ACADEMIC PROGRESS SNAPSHOT REDESIGN WITH DETAILED CATEGORY PROGRESS BARS
+--------------------------------------------------------------------------------
+- BEFORE:
+  * The snapshot's 3rd card only had 4 tiny text boxes (`Core`, `MNS`, `Elect`,
+    `Thesis`) without progress bars or individual GenEd stream breakdowns.
+- NOW:
+  * Combined **Degree Progress (`X / 136 Cr`)** and **Cumulative GPA (`X.XX / 4.00`
+    + Target Goal)** into Card 1 of the snapshot metric strip.
+  * Dedicated Card 2 to **Core & Electives (`97 Cr`)** with individual labeled
+    progress bars for `Program Core (75 Cr)`, `School Core MNS (12 Cr)`,
+    `Major Electives (6 Cr)`, and `Capstone Thesis (4 Cr)`.
+  * Dedicated Card 3 to **University Core GenEd (`39 Cr`)** with individual
+    progress bars for all 6 GenEd buckets (`S1: Writing`, `S2: Math/Sci`,
+    `S3: Arts/Hum`, `S4: Social Sci`, `S5: CST`, and `Free GenEd`).
+  * Added **`Developed by Khan Abdullah`** to the snapshot footer watermark.
+
+5. CURRICULUM ROADMAP UPDATED FROM `Updated_Degree_Plan_CSE.docx.pdf`
+--------------------------------------------------------------------------------
+- BEFORE:
+  * Some course names, aliases, and GenEd stream options differed from the
+    updated official degree plan PDF, and category colors were missing.
+- NOW:
+  * Updated `courses-data.ts` and the Curriculum Roadmap modal to match
+    `Updated_Degree_Plan_CSE.docx.pdf`:
+      - Added `HUM104`, `HUM110`, `HUM201` to Stream 3 and `DEV101` (`EMB101 /
+        DEV101`) to Stream 4.
+      - Added official cross-listed aliases on `CSE110` (`CSE110 / CSE161 /
+        EEE/ECE103`) and `CSE260` (`CSE260 / EEE/ECE283 / EEE301`).
+      - Added the official **Program Elective (6 Cr)** rule (*"Min 1 CSE, others
+        maybe COD/GenEd/Minor/2nd Major"*) and **GenEd Electives (6 Cr)** rule
+        (*"After completing the 11 minimum stream courses, take 2 GenEd elective
+        courses from Streams 2, 3, 4, 5 or any elective outside CSE"*).
+      - Restored distinct category colors across all 7 summary boxes, section
+        headers, course badges, and stream cards.
+
+6. CGPA BARS GRAPH: CLEAN REFERENCE LINE & EDITABLE TARGET GOAL IN TOP RIGHT
+--------------------------------------------------------------------------------
+- BEFORE:
+  * A floating `"Target 3.50"` text pill sat behind/over the bars on the dashed
+    line, the bottom legend only said `"Target Goal"`, and the top-right
+    `"Goal: 3.50"` badge was read-only.
+- NOW:
+  * Removed the text badge from behind the bars in `CgpaSemesterGraph.tsx` while
+    keeping the clean amber dashed line.
+  * Updated the bottom legend to display **`Target Goal (3.50)`** with the live
+    target value.
+  * Made the top-right **`Goal: [3.50]`** pill in `CgpaSemesterGraph.tsx`
+    directly editable so you can change your target CGPA right from the graph
+    header.
+
+7. EVERY MODAL & PAGE UNIFIED TO LANDING PAGE AESTHETIC + DARK/LIGHT PERSISTENCE
+--------------------------------------------------------------------------------
+- BEFORE:
+  * Several modals (`Category Course Selector`, `Reset Confirmation`, `Cloud
+    Conflict`, `Add Semester`) used older headers, and `/privacy` and `/terms`
+    did not persist dark/light mode on load.
+- NOW:
+  * Added the Landing Page macOS window-chrome header bar (`route136.app/...`)
+    to every modal across the application and removed the redundant `"Elective"`
+    pill next to `"MANDATORY CORE"` in the Category Course Selector.
+  * Added a full labeled desktop left sidebar and fixed main workspace scrolling.
+  * Added synchronous theme hydration in `src/app/layout.tsx` and an interactive
+    `ThemeToggleButton` on `/privacy` and `/terms`.
+================================================================================

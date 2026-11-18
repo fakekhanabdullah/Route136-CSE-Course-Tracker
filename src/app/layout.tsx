@@ -44,6 +44,24 @@ export default function RootLayout({
     >
       <head>
         <meta name="google-site-verification" content="IPWUw60VNgRfSKJlcp8Z8I1NnAxnc1U3SEoQehG5UGE" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('flow136_theme');
+                  if (saved === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  } else if (saved === 'light') {
+                    document.documentElement.classList.remove('dark');
+                  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans transition-colors duration-200">{children}</body>
     </html>

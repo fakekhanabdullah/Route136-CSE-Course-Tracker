@@ -155,7 +155,7 @@ async function safeDriveFetch(url: string, options: RequestInit): Promise<Respon
  * Requests an OAuth2 access token with Google Drive AppData and UserInfo scopes
  * Strictly restricted to BRAC University G Suite domain (g.bracu.ac.bd)
  */
-export async function requestGoogleAccessToken(clientId: string): Promise<string> {
+export async function requestGoogleAccessToken(clientId: string): Promise<string | null> {
   await loadGoogleGsiScript();
 
   if (!(window as any).google?.accounts?.oauth2) {
@@ -167,14 +167,18 @@ export async function requestGoogleAccessToken(clientId: string): Promise<string
       const client = (window as any).google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
-        hd: 'g.bracu.ac.bd',
+        hosted_domain: 'g.bracu.ac.bd',
         callback: (response: any) => {
           if (response.error) {
+            if (response.error === 'access_denied' || response.error === 'popup_closed_by_user') {
+              resolve(null);
+              return;
+            }
             reject(new Error(response.error_description || response.error || 'Google Sign-In was cancelled or denied.'));
             return;
           }
           if (!response.access_token) {
-            reject(new Error('No access token returned from Google.'));
+            resolve(null);
             return;
           }
           const expiresInSec = parseInt(response.expires_in, 10) || 3600;
@@ -184,12 +188,17 @@ export async function requestGoogleAccessToken(clientId: string): Promise<string
           resolve(response.access_token);
         },
         error_callback: (err: any) => {
-          reject(new Error(err?.message || 'Google Auth Error occurred.'));
+          // If the user closed the popup or popup failed to open, resolve null silently so Next.js dev overlay never triggers
+          const msg = String(err?.message || err?.type || '').toLowerCase();
+          if (err?.type === 'popup_closed' || msg.includes('popup') || msg.includes('closed') || msg.includes('cancel')) {
+            resolve(null);
+            return;
+          }
+          resolve(null);
         }
       });
 
-      // Pass hd parameter to enforce Google domain restriction
-      client.requestAccessToken({ prompt: 'consent', hd: 'g.bracu.ac.bd' });
+      client.requestAccessToken();
     } catch (err: any) {
       reject(err);
     }

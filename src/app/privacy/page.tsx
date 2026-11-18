@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Metadata } from "next";
 import { Lock, ArrowLeft, ExternalLink, CheckCircle2, AlertCircle, Database, RefreshCw, Mail, Shield } from "lucide-react";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Route136 - BRACU CSE Course Tracker",
@@ -14,42 +15,70 @@ export default function PrivacyPolicyPage() {
   const appUrl = "https://route136-cse-course-tracker.vercel.app";
 
   return (
-    <div className="min-h-screen bg-[#fafafa] dark:bg-[#000000] text-[#171717] dark:text-[#ededed] font-sans transition-colors selection:bg-[#0070f3]/20 selection:text-[#0070f3]">
-      {/* Top Sticky Header */}
-      <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 dark:bg-[#0a0a0a]/80 border-b border-[#ebebeb] dark:border-[#262626] px-4 sm:px-8 py-3.5 flex items-center justify-between transition-colors">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-xs font-medium text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle group"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-[#888888]" />
-            <span>Back to Planner</span>
-          </Link>
-          <div className="h-4 w-px bg-[#ebebeb] dark:bg-[#262626] hidden sm:block" />
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-[#171717] dark:bg-[#ededed] flex items-center justify-center text-white dark:text-black text-xs font-semibold shadow-vercel-subtle">
-              R
-            </div>
-            <span className="font-semibold text-sm tracking-tight text-[#171717] dark:text-[#ededed]">Route136</span>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#050505] text-[#171717] dark:text-[#ededed] font-sans relative overflow-x-hidden transition-colors selection:bg-[#0070f3]/20 selection:text-[#0070f3]">
+      {/* Vercel Structural Grid + Atmospheric Radial Spotlight */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808014_1px,transparent_1px),linear-gradient(to_bottom,#80808014_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_85%_65%_at_50%_15%,#000_65%,transparent_100%)]" />
+        <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[780px] h-[380px] bg-gradient-to-tr from-[#0070f3]/12 via-cyan-500/8 to-transparent rounded-full blur-[110px]" />
+      </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-[#888888] hidden md:inline">Legal Docs:</span>
-          <span className="px-3 py-1.5 rounded-lg bg-[#f0f0f0] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium shadow-vercel-subtle">
-            Privacy Policy
-          </span>
-          <Link
-            href="/terms"
-            className="px-3 py-1.5 rounded-lg bg-transparent hover:bg-[#f5f5f5] dark:hover:bg-[#141414] border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] font-medium transition"
-          >
-            Terms of Service
-          </Link>
+      {/* Top Sticky Header */}
+      <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#fafafa]/80 dark:bg-[#050505]/80 border-b border-[#ebebeb] dark:border-[#1f1f1f] transition-colors">
+        <div className="px-4 sm:px-6 h-14 max-w-6xl mx-auto w-full flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-xs font-medium text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle group"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-[#888888]" />
+              <span>Back to Planner</span>
+            </Link>
+            <div className="h-4 w-px bg-[#ebebeb] dark:bg-[#262626] hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-[#171717] dark:bg-[#ededed] flex items-center justify-center text-white dark:text-[#171717] shadow-vercel-subtle shrink-0">
+                <svg className="h-3.5 w-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                </svg>
+              </div>
+              <span className="font-semibold text-sm tracking-tight text-[#171717] dark:text-[#ededed]">Route136</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-3 py-1.5 rounded-lg bg-white dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium shadow-vercel-subtle">
+              Privacy Policy
+            </span>
+            <Link
+              href="/terms"
+              className="px-3 py-1.5 rounded-lg bg-transparent hover:bg-white dark:hover:bg-[#141414] border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] font-medium transition"
+            >
+              Terms of Service
+            </Link>
+            <ThemeToggleButton />
+          </div>
         </div>
       </header>
 
       {/* Main Content Container */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-8 py-10 sm:py-16 space-y-10">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="rounded-2xl bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] shadow-vercel-modal overflow-hidden">
+          {/* Window Chrome Bar */}
+          <div className="px-4 sm:px-6 py-2.5 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+            </div>
+            <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>route136.app/privacy</span>
+            </div>
+            <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+              LEGAL DOCS
+            </span>
+          </div>
+
+          <div className="p-6 sm:p-10 space-y-10">
         
         {/* Hero Section */}
         <div className="space-y-4 border-b border-[#ebebeb] dark:border-[#262626] pb-8">
@@ -364,7 +393,8 @@ export default function PrivacyPolicyPage() {
             <a href="https://github.com/fakekhanabdullah/Route136-CSE-Course-Tracker" target="_blank" rel="noopener noreferrer" className="hover:text-[#171717] dark:hover:text-[#ededed] transition">GitHub</a>
           </div>
         </footer>
-
+          </div>
+        </div>
       </main>
     </div>
   );

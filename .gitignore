@@ -40,8 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Charts
+# Charts & Degree Plan Reference Assets
 chart.jpg
+/flow charts and updated degree plan/
+flow charts and updated degree plan/
 
 # Private developer documentation
 GOOGLE_OAUTH_VERIFICATION_GUIDE.md

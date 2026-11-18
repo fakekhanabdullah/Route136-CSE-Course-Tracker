@@ -50,11 +50,15 @@ export const COURSES: Course[] = [
   { code: "HUM101", title: "World Civilization & Culture", credits: 3, category: "GenEd Stream 3", mandatory: false },
   { code: "HUM102", title: "Introduction to Philosophy", credits: 3, category: "GenEd Stream 3", mandatory: false },
   { code: "HUM207", title: "Narratives of Truth and Lies", credits: 3, category: "GenEd Stream 3", mandatory: false },
+  { code: "HUM104", title: "Art and Aesthetics", credits: 3, category: "GenEd Stream 3", mandatory: false },
+  { code: "HUM110", title: "Introduction to Humanities", credits: 3, category: "GenEd Stream 3", mandatory: false },
+  { code: "HUM201", title: "Studies in Literature and Culture", credits: 3, category: "GenEd Stream 3", mandatory: false },
   { code: "HUM210", title: "Streaming Media Cultures", credits: 3, category: "GenEd Stream 3", mandatory: false },
   { code: "HUM301", title: "In the Archives", credits: 3, category: "GenEd Stream 3", mandatory: false },
 
   // GenEd Stream 4
   { code: "EMB101", title: "Emergence of Bangladesh", credits: 3, category: "GenEd Stream 4", mandatory: true },
+  { code: "DEV101", title: "Bangladesh Studies", credits: 3, category: "GenEd Stream 4", mandatory: false },
   { code: "ANT101", title: "Introduction to Anthropology", credits: 3, category: "GenEd Stream 4", mandatory: false },
   { code: "ANT342", title: "Body and Society", credits: 3, category: "GenEd Stream 4", mandatory: false },
   { code: "ANT351", title: "Gender & Development", credits: 3, category: "GenEd Stream 4", mandatory: false },

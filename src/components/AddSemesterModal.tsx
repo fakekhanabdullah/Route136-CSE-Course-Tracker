@@ -74,11 +74,30 @@ export default function AddSemesterModal({
   const semesterCourseCodes = new Set(semester.courses.map(c => c.code));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+      onClick={onClose}
+    >
       <div 
-        className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl shadow-vercel-modal overflow-hidden transition-all text-[#171717] dark:text-[#ededed]"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal overflow-hidden transition-all text-[#171717] dark:text-[#ededed]"
         onClick={e => e.stopPropagation()}
       >
+        {/* Window Chrome Bar */}
+        <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+          </div>
+          <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+            <span>route136.app/semester-editor</span>
+          </div>
+          <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+            TERM
+          </span>
+        </div>
+
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between">
           <div className="flex items-center gap-3">
