@@ -217,3 +217,57 @@ export const PREREQUISITES: Record<string, PrereqRule> = {
   "CSE490": { "hp": ["CSE320", "CSE321"], "sp": [] },
   "CSE491": { "hp": ["CSE400"], "sp": [] }
 };
+
+const CUSTOM_COURSES_STORAGE_KEY = "route136_custom_courses";
+
+/** Registers a user-created course into the in-memory catalog and persists it to localStorage. */
+export function registerCustomCourse(course: Course): void {
+  const normalizedCode = course.code.trim().toUpperCase();
+  if (!normalizedCode) return;
+
+  const entry: Course = {
+    ...course,
+    code: normalizedCode,
+    title: course.title.trim() || `Custom Course (${normalizedCode})`,
+  };
+
+  const existingIdx = COURSES.findIndex((c) => c.code === normalizedCode);
+  if (existingIdx >= 0) {
+    COURSES[existingIdx] = entry;
+  } else {
+    COURSES.push(entry);
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_COURSES_STORAGE_KEY);
+      const saved: Course[] = raw ? JSON.parse(raw) : [];
+      const next = saved.filter((c) => c.code !== normalizedCode);
+      next.push(entry);
+      window.localStorage.setItem(CUSTOM_COURSES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Ignore storage errors in restricted contexts
+    }
+  }
+}
+
+/** Loads persisted user-created courses from localStorage into the in-memory catalog. */
+export function loadCustomCoursesFromStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_COURSES_STORAGE_KEY);
+    if (!raw) return;
+    const saved: Course[] = JSON.parse(raw);
+    if (!Array.isArray(saved)) return;
+    saved.forEach((course) => {
+      if (course && typeof course.code === "string") {
+        const normalizedCode = course.code.trim().toUpperCase();
+        if (normalizedCode && !COURSES.some((c) => c.code === normalizedCode)) {
+          COURSES.push({ ...course, code: normalizedCode });
+        }
+      }
+    });
+  } catch {
+    // Ignore malformed localStorage data
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Link from "next/link";
 import { toBlob } from "html-to-image";
 import { 
   AlertTriangle, 
@@ -62,7 +63,7 @@ import {
   Moon,
   GitBranch
 } from "lucide-react";
-import { COURSES, PREREQUISITES, Course, PrereqRule } from "./courses-data";
+import { COURSES, PREREQUISITES, Course, PrereqRule, loadCustomCoursesFromStorage } from "./courses-data";
 import {
   CloudUser,
   DriveBackupPayload,
@@ -91,6 +92,8 @@ import QuickGradeCarouselModal from "@/components/QuickGradeCarouselModal";
 import SpeedDialMenu from "@/components/SpeedDialMenu";
 import MobileBottomNav, { MobileTab } from "@/components/MobileBottomNav";
 import PrereqChainsModal from "@/components/PrereqChainsModal";
+import LandingFeatureShowcase from "@/components/LandingFeatureShowcase";
+import CoursePerformanceWorkspace from "@/components/CoursePerformanceWorkspace";
 
 
 // Prerequisite Helper functions
@@ -236,6 +239,16 @@ const dedupeSemesterCourses = (courses: SelectedCourse[]): SelectedCourse[] => {
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
 
+  // Landing Page Live Preview animation step (cycles 0 -> 1 -> 2 -> 3)
+  const [previewStep, setPreviewStep] = useState<number>(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPreviewStep(prev => (prev + 1) % 4);
+    }, 2200);
+    return () => clearInterval(timer);
+  }, []);
+
   // Vercel Dual-Mode Theme (Dark / Light)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -348,7 +361,11 @@ export default function Home() {
   const [quickGradesInitialSemIdx, setQuickGradesInitialSemIdx] = useState<number>(0);
   const [isMobileSpeedDialOpen, setIsMobileSpeedDialOpen] = useState<boolean>(false);
   const [mobileActiveTab, setMobileActiveTab] = useState<MobileTab>("semesters");
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'tracker' | 'performance' | 'prereq'>('tracker');
+  const [performanceTab, setPerformanceTab] = useState<'marks' | 'attendance'>('marks');
+  const [prereqDeptFilter, setPrereqDeptFilter] = useState<'ALL' | 'CSE' | 'MNS' | 'ENG'>('ALL');
   const [isExtraSidebarOpen, setIsExtraSidebarOpen] = useState<boolean>(false);
+  const [showAcademicGuideModal, setShowAcademicGuideModal] = useState<boolean>(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
 
@@ -604,6 +621,7 @@ export default function Home() {
       }
     }
 
+    loadCustomCoursesFromStorage();
     try {
       const savedView = localStorage.getItem("flow136_view_mode");
       if (savedView === "list" || savedView === "kanban") {
@@ -3189,10 +3207,26 @@ export default function Home() {
   if (!showDashboard || (!cloudUser && !isGuest)) {
     return (
       <div className="min-h-screen w-full bg-[#fafafa] dark:bg-[#050505] text-[#171717] dark:text-[#ededed] font-sans antialiased flex flex-col justify-between relative overflow-x-hidden transition-colors duration-200">
-        {/* Vercel Structural Grid + Atmospheric Radial Spotlight */}
+        {/* Vercel Structural Grid + Minimal Tech Circuit Traces + Atmospheric Radial Spotlight */}
         <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808014_1px,transparent_1px),linear-gradient(to_bottom,#80808014_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_85%_65%_at_50%_15%,#000_65%,transparent_100%)]" />
-          <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[780px] h-[380px] bg-gradient-to-tr from-[#0070f3]/12 via-cyan-500/8 to-transparent rounded-full blur-[110px]" />
+          <div className="absolute -top-36 left-1/2 w-[780px] h-[380px] bg-gradient-to-tr from-[#0070f3]/14 via-cyan-500/8 to-transparent rounded-full blur-[110px] animate-spotlight-breathe" />
+
+          {/* Minimal Horizontal Data-Pulse Traces aligned to 36px grid */}
+          <div className="absolute top-[144px] inset-x-0 h-px overflow-hidden opacity-60">
+            <div className="w-40 h-px bg-gradient-to-r from-transparent via-[#0070f3] to-transparent animate-trace-x-slow" />
+          </div>
+          <div className="absolute top-[396px] inset-x-0 h-px overflow-hidden opacity-45">
+            <div className="w-56 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-trace-x-delayed" />
+          </div>
+
+          {/* Minimal Vertical Data-Pulse Traces aligned to 36px grid */}
+          <div className="absolute left-[18%] inset-y-0 w-px overflow-hidden opacity-50">
+            <div className="h-36 w-px bg-gradient-to-b from-transparent via-[#0070f3] to-transparent animate-trace-y-slow" />
+          </div>
+          <div className="absolute right-[22%] inset-y-0 w-px overflow-hidden opacity-45">
+            <div className="h-44 w-px bg-gradient-to-b from-transparent via-cyan-400 to-transparent animate-trace-y-delayed" />
+          </div>
         </div>
 
         {/* Top Navigation Bar */}
@@ -3466,255 +3500,283 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Mockup Body */}
-                <div className="p-4 sm:p-5 space-y-4">
-                  {/* Top Metric Strip */}
-                  <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
-                        <span>DEGREE PROGRESS</span>
-                        <span className="text-[#0070f3] font-semibold">79.4%</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
-                        108 <span className="text-xs font-normal text-[#888888]">/ 136 Cr</span>
-                      </div>
-                      <div className="mt-2 h-1.5 w-full rounded-full bg-[#eaeaea] dark:bg-[#222222] overflow-hidden">
-                        <div className="h-full w-[79%] bg-[#0070f3] rounded-full" />
-                      </div>
-                    </div>
+                {/* Mockup Body (Animated Live Preview) */}
+                {(() => {
+                  const previewFrames = [
+                    { credits: 96, pct: "70.6%", barW: "70.6%", cgpa: "3.68", genedCr: 27, streamsLit: 3, sem3Selected: false, rsSelected: false, prereqReady: false },
+                    { credits: 108, pct: "79.4%", barW: "79.4%", cgpa: "3.74", genedCr: 30, streamsLit: 4, sem3Selected: true, rsSelected: false, prereqReady: false },
+                    { credits: 117, pct: "86.0%", barW: "86.0%", cgpa: "3.79", genedCr: 36, streamsLit: 5, sem3Selected: true, rsSelected: true, prereqReady: false },
+                    { credits: 120, pct: "88.2%", barW: "88.2%", cgpa: "3.82", genedCr: 39, streamsLit: 5, sem3Selected: true, rsSelected: true, prereqReady: true },
+                  ];
+                  const frame = previewFrames[previewStep] || previewFrames[0];
 
-                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
-                        <span>CUMULATIVE GPA</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">HONS</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
-                        3.74 <span className="text-xs font-normal text-[#888888]">/ 4.00</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1 text-[10px] font-mono text-[#888888]">
-                        <span>Target:</span>
-                        <span className="text-[#171717] dark:text-[#ededed] font-medium">3.80</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
-                        <span>GENED STREAMS</span>
-                        <span className="text-[#171717] dark:text-[#ededed]">5/5</span>
-                      </div>
-                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
-                        36 <span className="text-xs font-normal text-[#888888]">/ 39 Cr</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1">
-                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
-                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
-                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
-                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
-                        <span className="h-1.5 flex-1 rounded-full bg-[#eaeaea] dark:bg-[#262626]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mockup Semester Columns */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Sample Semester Card 1 */}
-                    <div className="rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] p-3 space-y-2.5">
-                      <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="h-4 w-4 rounded bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] flex items-center justify-center text-[10px] font-bold">✓</span>
-                          <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Semester 3 • Fall</span>
+                  return (
+                    <div className="p-4 sm:p-5 space-y-4">
+                      {/* Top Metric Strip */}
+                      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                        <div className={`p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border transition-all duration-500 ${
+                          previewStep > 0 ? "border-[#0070f3]/40 shadow-vercel-subtle" : "border-[#ebebeb] dark:border-[#222222]"
+                        }`}>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                            <span>DEGREE PROGRESS</span>
+                            <span className="text-[#0070f3] font-semibold transition-all duration-500">{frame.pct}</span>
+                          </div>
+                          <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed] transition-all duration-500">
+                            {frame.credits} <span className="text-xs font-normal text-[#888888]">/ 136 Cr</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-[#eaeaea] dark:bg-[#222222] overflow-hidden">
+                            <div
+                              style={{ width: frame.barW }}
+                              className="h-full bg-[#0070f3] rounded-full transition-all duration-700 ease-out"
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 font-mono text-[10px]">
-                          <span className="px-1.5 py-0.5 rounded bg-white dark:bg-[#191919] border border-[#ebebeb] dark:border-[#262626] text-[#666666] dark:text-[#999999]">12 Cr</span>
-                          <span className="px-1.5 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3] font-semibold">SGPA 3.83</span>
-                        </div>
-                      </div>
 
-                      <div className="space-y-1.5">
-                        {[
-                          { code: "CSE220", title: "Data Structures", grade: "A (4.0)", tag: "Core" },
-                          { code: "CSE230", title: "Discrete Mathematics", grade: "A (4.0)", tag: "Core" },
-                          { code: "MAT215", title: "Complex Variables & Laplace", grade: "A- (3.7)", tag: "Math" },
-                          { code: "STA201", title: "Elements of Statistics", grade: "B+ (3.3)", tag: "Sci" },
-                        ].map((item) => (
-                          <div key={item.code} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
-                              <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
-                            </div>
-                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#222222] text-[#171717] dark:text-[#ededed] shrink-0">
-                              {item.grade}
+                        <div className={`p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border transition-all duration-500 ${
+                          previewStep >= 2 ? "border-emerald-500/40 shadow-vercel-subtle" : "border-[#ebebeb] dark:border-[#222222]"
+                        }`}>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                            <span>CUMULATIVE GPA</span>
+                            <span className={`font-semibold transition-colors duration-500 ${
+                              previewStep === 3 ? "text-emerald-500" : "text-emerald-600 dark:text-emerald-400"
+                            }`}>
+                              {previewStep === 3 ? "GOAL MET ✓" : "HONS"}
                             </span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sample Semester Card 2 + Dependency Validator Preview */}
-                    <div className="rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] p-3 flex flex-col justify-between space-y-2.5">
-                      <div>
-                        <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2 mb-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="h-4 w-4 rounded bg-[#0070f3] text-white flex items-center justify-center text-[9px] font-mono font-bold">RS</span>
-                            <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Residential Semester</span>
+                          <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed] flex items-baseline gap-1.5">
+                            <span>{frame.cgpa}</span>
+                            <span className="text-xs font-normal text-[#888888]">/ 4.00</span>
+                            {previewStep > 0 && (
+                              <span className="text-[10px] text-emerald-500 font-semibold animate-in fade-in duration-300">
+                                ↑
+                              </span>
+                            )}
                           </div>
-                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3]">
-                            Savar Campus
-                          </span>
+                          <div className="mt-2 flex items-center gap-1 text-[10px] font-mono text-[#888888]">
+                            <span>Target:</span>
+                            <span className="text-[#171717] dark:text-[#ededed] font-medium">3.80</span>
+                          </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                          {[
-                            { code: "ENG102", title: "English Composition I", status: "Stream 1" },
-                            { code: "EMB101", title: "Emergence of Bangladesh", status: "Stream 3" },
-                            { code: "HUM103", title: "Ethics and Culture", status: "Stream 4" },
-                          ].map((item) => (
-                            <div key={item.code} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
-                                <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
-                              </div>
-                              <span className="font-mono text-[10px] text-[#0070f3] bg-[#0070f3]/10 px-1.5 py-0.5 rounded shrink-0">
-                                {item.status}
+                        <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222] transition-all duration-500">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                            <span>GENED STREAMS</span>
+                            <span className="text-[#171717] dark:text-[#ededed] transition-all duration-500">{frame.streamsLit}/5</span>
+                          </div>
+                          <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed] transition-all duration-500">
+                            {frame.genedCr} <span className="text-xs font-normal text-[#888888]">/ 39 Cr</span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-1">
+                            {[0, 1, 2, 3, 4].map((idx) => (
+                              <span
+                                key={idx}
+                                className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                                  idx < frame.streamsLit ? "bg-[#0070f3]" : "bg-[#eaeaea] dark:bg-[#262626]"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mockup Semester Columns */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Sample Semester Card 1 */}
+                        <div
+                          onClick={() => setPreviewStep(1)}
+                          className={`rounded-xl p-3 space-y-2.5 border transition-all duration-500 cursor-pointer ${
+                            previewStep === 1
+                              ? "bg-[#0070f3]/[0.04] dark:bg-[#0070f3]/[0.07] border-[#0070f3] ring-2 ring-[#0070f3]/20 scale-[1.01]"
+                              : frame.sem3Selected
+                              ? "bg-[#fafafa] dark:bg-[#111111] border-emerald-500/40"
+                              : "bg-[#fafafa] dark:bg-[#111111] border-[#ebebeb] dark:border-[#222222]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`h-4 w-4 rounded flex items-center justify-center text-[10px] font-bold transition-all duration-500 ${
+                                frame.sem3Selected
+                                  ? "bg-[#0070f3] text-white scale-105"
+                                  : "bg-[#e5e5e5] dark:bg-[#222222] text-transparent"
+                              }`}>
+                                ✓
+                              </span>
+                              <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Semester 3 • Fall</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                              <span className="px-1.5 py-0.5 rounded bg-white dark:bg-[#191919] border border-[#ebebeb] dark:border-[#262626] text-[#666666] dark:text-[#999999]">12 Cr</span>
+                              <span className={`px-1.5 py-0.5 rounded border font-semibold transition-all duration-500 ${
+                                frame.sem3Selected
+                                  ? "bg-[#0070f3]/15 border-[#0070f3]/40 text-[#0070f3]"
+                                  : "bg-white dark:bg-[#191919] border-[#ebebeb] dark:border-[#262626] text-[#888888]"
+                              }`}>
+                                SGPA 3.83
                               </span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                          </div>
 
-                      {/* Prerequisite Chain Status Pill */}
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#666666] dark:text-[#999999]">
-                          <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE111</span>
-                          <span>→</span>
-                          <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE220</span>
-                          <span>→</span>
-                          <span className="text-[#0070f3] font-semibold">CSE221</span>
+                          <div className="space-y-1.5">
+                            {[
+                              { code: "CSE220", title: "Data Structures", grade: "A (4.0)" },
+                              { code: "CSE230", title: "Discrete Mathematics", grade: "A (4.0)" },
+                              { code: "MAT215", title: "Complex Variables & Laplace", grade: "A- (3.7)" },
+                              { code: "STA201", title: "Elements of Statistics", grade: "B+ (3.3)" },
+                            ].map((item) => (
+                              <div
+                                key={item.code}
+                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition-all duration-500 ${
+                                  frame.sem3Selected
+                                    ? "bg-white dark:bg-[#161616] border-[#0070f3]/25"
+                                    : "bg-white dark:bg-[#161616] border-[#ebebeb] dark:border-[#242424] opacity-75"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
+                                  <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
+                                </div>
+                                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded shrink-0 transition-colors duration-500 ${
+                                  frame.sem3Selected
+                                    ? "bg-[#0070f3]/10 text-[#0070f3] font-semibold"
+                                    : "bg-[#f5f5f5] dark:bg-[#222222] text-[#888888]"
+                                }`}>
+                                  {item.grade}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          PREREQS VALID
-                        </span>
+
+                        {/* Sample Semester Card 2 + Dependency Validator Preview */}
+                        <div
+                          onClick={() => setPreviewStep(2)}
+                          className={`rounded-xl p-3 flex flex-col justify-between space-y-2.5 border transition-all duration-500 cursor-pointer ${
+                            previewStep === 2
+                              ? "bg-[#0070f3]/[0.04] dark:bg-[#0070f3]/[0.07] border-[#0070f3] ring-2 ring-[#0070f3]/20 scale-[1.01]"
+                              : frame.rsSelected
+                              ? "bg-[#fafafa] dark:bg-[#111111] border-emerald-500/40"
+                              : "bg-[#fafafa] dark:bg-[#111111] border-[#ebebeb] dark:border-[#222222]"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2 mb-2.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`h-4 w-4 rounded flex items-center justify-center text-[9px] font-mono font-bold transition-all duration-500 ${
+                                  frame.rsSelected ? "bg-[#0070f3] text-white scale-105" : "bg-[#e5e5e5] dark:bg-[#222222] text-[#888888]"
+                                }`}>
+                                  {frame.rsSelected ? "✓" : "RS"}
+                                </span>
+                                <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Residential Semester</span>
+                              </div>
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3]">
+                                Savar Campus
+                              </span>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {[
+                                { code: "ENG102", title: "English Composition I", status: "Stream 1" },
+                                { code: "EMB101", title: "Emergence of Bangladesh", status: "Stream 3" },
+                                { code: "HUM103", title: "Ethics and Culture", status: "Stream 4" },
+                              ].map((item) => (
+                                <div
+                                  key={item.code}
+                                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition-all duration-500 ${
+                                    frame.rsSelected
+                                      ? "bg-white dark:bg-[#161616] border-[#0070f3]/25"
+                                      : "bg-white dark:bg-[#161616] border-[#ebebeb] dark:border-[#242424] opacity-75"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
+                                    <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
+                                  </div>
+                                  <span className="font-mono text-[10px] text-[#0070f3] bg-[#0070f3]/10 px-1.5 py-0.5 rounded shrink-0">
+                                    {item.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Prerequisite Chain Status Pill */}
+                          <div className={`p-2.5 rounded-lg bg-white dark:bg-[#161616] border flex items-center justify-between gap-2 transition-all duration-500 ${
+                            frame.prereqReady ? "border-emerald-500/40" : "border-[#ebebeb] dark:border-[#242424]"
+                          }`}>
+                            <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#666666] dark:text-[#999999]">
+                              <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE111</span>
+                              <span>→</span>
+                              <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE220</span>
+                              <span>→</span>
+                              <span className="text-[#0070f3] font-semibold">CSE221</span>
+                            </div>
+                            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-all duration-500 ${
+                              frame.prereqReady
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-semibold"
+                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                            }`}>
+                              {frame.prereqReady ? "CHAIN UNLOCKED ✓" : "PREREQS VALID"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
 
-          {/* Vercel Architectural Bento Grid Section */}
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-[#ebebeb] dark:border-[#222222] pb-4">
-              <div>
-                <span className="text-[11px] font-mono text-[#0070f3] uppercase tracking-wider">
-                  [ System Capabilities ]
-                </span>
-                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed] mt-1">
-                  Built specifically for BRACU CSE degree rules.
-                </h2>
-              </div>
-              <p className="text-xs text-[#666666] dark:text-[#888888] font-mono">
-                45 Core • 42 Foundation/GenEd • 21 Electives • 4 Cr Thesis
+          {/* Interactive Feature Showcase Slideshow */}
+          <LandingFeatureShowcase />
+
+          {/* What is Route136 & How It Helps */}
+          <section className="max-w-4xl mx-auto w-full space-y-6 pt-4">
+            <div className="border-b border-[#ebebeb] dark:border-[#222222] pb-4 space-y-2">
+              <span className="text-[11px] font-mono text-[#0070f3] uppercase tracking-wider">
+                [ About Route136 ]
+              </span>
+              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                What is Route136, and how does it help?
+              </h2>
+              <p className="text-sm text-[#666666] dark:text-[#888888] leading-relaxed">
+                Route136 is a local-first academic planning and degree audit workspace built specifically for{" "}
+                <span className="text-[#171717] dark:text-[#ededed] font-medium">BRAC University CSE students</span>{" "}
+                following the 136-credit curriculum. Instead of juggling spreadsheets, PDF flowcharts, and manual GPA calculators, it keeps your entire degree roadmap accurate in one place.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-              {/* Bento Card 1: Pre-req Chain Sequence Viewer (3 cols) */}
-              <div className="md:col-span-3 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 sm:p-6 shadow-vercel-card flex flex-col justify-between gap-4 hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-emerald-500">
-                      <GitBranch className="h-4 w-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626]">
-                      PRE-REQ CHAIN
-                    </span>
-                  </div>
-                  <h3 className="text-base font-semibold text-[#171717] dark:text-[#ededed] mb-1.5">
-                    Interactive Prerequisite Chains
-                  </h3>
-                  <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                    Visualize every CSE, MNS &amp; BIL prerequisite sequence in one flowchart, track how many courses remain in each chain, and inspect what unlocks next.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE110 ✓</span>
-                    <span className="text-[#888888]">→</span>
-                    <span className="px-2 py-0.5 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE220 ✓</span>
-                    <span className="text-[#888888]">→</span>
-                    <span className="px-2 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/30 text-[#0070f3] font-medium">CSE221 Ready</span>
-                  </div>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">4 Left in Chain</span>
-                </div>
-              </div>
-
-              {/* Bento Card 2: CGPA & Target Solver (3 cols) */}
-              <div className="md:col-span-3 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 sm:p-6 shadow-vercel-card flex flex-col justify-between gap-4 hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3]">
-                      <Target className="h-4 w-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626]">
-                      TRAJECTORY ENGINE
-                    </span>
-                  </div>
-                  <h3 className="text-base font-semibold text-[#171717] dark:text-[#ededed] mb-1.5">
-                    Target CGPA Solver &amp; Retake ROI Analyzer
-                  </h3>
-                  <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                    Calculate the exact GPA required across your remaining credits to hit Vice Chancellor’s List or Dean’s List, and rank past courses by highest CGPA boost on retake.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
-                  <span className="text-[#666666] dark:text-[#888888]">Retake Simulation: <strong className="text-[#171717] dark:text-[#ededed]">MAT120 (B → A)</strong></span>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">+0.07 CGPA</span>
-                </div>
-              </div>
-
-              {/* Bento Card 3: 5-Stream GenEd Matrix (2 cols) */}
-              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
-                  <BookOpen className="h-4 w-4" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
-                  39-Credit GenEd Matrix
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] shadow-vercel-card space-y-2">
+                <span className="text-[10px] font-mono text-[#0070f3] uppercase tracking-wider">01 / Degree Rules</span>
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed]">
+                  Zero Prerequisite Mistakes
                 </h3>
                 <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                  Tracks all 5 mandatory GenEd streams, Residential Semester (RS) courses, and free elective caps without manual spreadsheet formulas.
+                  Automatically checks hard/soft prerequisites, maps CSE &amp; MNS prerequisite chains, and tracks all 5 GenEd streams plus RS placement.
                 </p>
               </div>
 
-              {/* Bento Card 4: Semester Performance Charts (2 cols) */}
-              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] mb-3">
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
-                  Semester Performance Charts
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] shadow-vercel-card space-y-2">
+                <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-wider">02 / GPA Strategy</span>
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed]">
+                  Smart Retake &amp; Target Planning
                 </h3>
                 <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                  Track term-by-term SGPA bars against an editable graduation target line, spot your peak semester, and click any bar for instant grade entry.
+                  See the exact SGPA needed across remaining credits to hit your target CGPA, and find which retakes deliver the highest CGPA boost.
                 </p>
               </div>
 
-              {/* Bento Card 5: 4K Snapshot Export (2 cols) */}
-              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
-                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
-                  <Camera className="h-4 w-4" />
-                </div>
-                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
-                  Grade Sheet PNG Snapshot
+              <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] shadow-vercel-card space-y-2">
+                <span className="text-[10px] font-mono text-purple-500 uppercase tracking-wider">03 / Privacy &amp; Export</span>
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed]">
+                  Private, Fast &amp; Advising-Ready
                 </h3>
                 <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
-                  Generate a clean, shareable academic summary card and full semester transcript image for advising or offline record keeping.
+                  Runs 100% locally in your browser with no account required—plus JSON backups and 4K Degree Audit PNG Snapshots ready for advising.
                 </p>
               </div>
             </div>
-          </div>
+          </section>
         </main>
 
         {/* Vercel Clean Hairline Footer */}
@@ -3817,60 +3879,152 @@ export default function Home() {
             </button>
           )}
 
-          {/* Workspace Navigation Links */}
+          {/* Workspace Navigation Links (3 Main Features) */}
           <div className="space-y-1">
             <span className="px-2.5 text-[10px] font-mono uppercase tracking-wider text-[#888888] block mb-1.5">
               Workspace
             </span>
 
+            {/* 1. Course Tracker & Planner (Default) */}
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById("category-requirements-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              onClick={() => setActiveWorkspaceView('tracker')}
+              className={`w-full px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeWorkspaceView === 'tracker'
+                  ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-semibold shadow-vercel-subtle"
+                  : "text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]"
+              }`}
             >
-              <Layers className="h-4 w-4 text-[#0070f3] shrink-0" />
-              <span>Degree Overview</span>
+              <Layers className={`h-4 w-4 shrink-0 ${activeWorkspaceView === 'tracker' ? "text-[#0070f3]" : "text-[#0070f3]"}`} />
+              <span>Course Tracker &amp; Planner</span>
             </button>
 
+            {/* Quick Section Anchors inside Course Tracker */}
+            {activeWorkspaceView === 'tracker' && (
+              <div className="pl-4 space-y-0.5 border-l border-[#ebebeb] dark:border-[#222222] ml-4 my-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("category-requirements-section");
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full px-2 py-1.5 rounded-md text-[11px] text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>Degree Overview</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("gpa-dashboard-section");
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full px-2 py-1.5 rounded-md text-[11px] text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>CGPA &amp; Trajectory</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("semester-planner-section");
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full px-2 py-1.5 rounded-md text-[11px] text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>Semester Planner</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCapstoneCollapsed(false);
+                    const el = document.getElementById("capstone-section");
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="w-full px-2 py-1.5 rounded-md text-[11px] text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>CSE400 Capstone</span>
+                </button>
+              </div>
+            )}
+
+            {/* 2. Course Performance */}
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById("gpa-dashboard-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              onClick={() => setActiveWorkspaceView('performance')}
+              className={`w-full px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeWorkspaceView === 'performance'
+                  ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-semibold shadow-vercel-subtle"
+                  : "text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]"
+              }`}
             >
-              <TrendingUp className="h-4 w-4 text-emerald-500 shrink-0" />
-              <span>CGPA &amp; Trajectory</span>
+              <TrendingUp className="h-4 w-4 text-cyan-500 shrink-0" />
+              <span>Course Performance</span>
             </button>
 
+            {/* Quick Sub-tabs under Course Performance */}
+            {activeWorkspaceView === 'performance' && (
+              <div className="pl-4 space-y-0.5 border-l border-[#ebebeb] dark:border-[#222222] ml-4 my-1">
+                {(
+                  [
+                    { id: 'marks', label: 'Mark Distribution Spreadsheet' },
+                    { id: 'attendance', label: 'Attendance & Schedule' },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setPerformanceTab(item.id)}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] text-left transition-all cursor-pointer ${
+                      performanceTab === item.id
+                        ? "text-[#0070f3] font-semibold bg-[#0070f3]/10"
+                        : "text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]"
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 3. Pre-req Chain */}
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById("semester-planner-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
+              onClick={() => setActiveWorkspaceView('prereq')}
+              className={`w-full px-2.5 py-2 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-all cursor-pointer ${
+                activeWorkspaceView === 'prereq'
+                  ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-semibold shadow-vercel-subtle"
+                  : "text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]"
+              }`}
             >
-              <Calendar className="h-4 w-4 text-amber-500 shrink-0" />
-              <span>Semester Planner</span>
+              <GitBranch className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span>Pre-req Chain</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsCapstoneCollapsed(false);
-                const el = document.getElementById("capstone-section");
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
-            >
-              <GraduationCap className="h-4 w-4 text-purple-500 shrink-0" />
-              <span>CSE400 Capstone</span>
-            </button>
+            {/* Quick Department Chain Filters under Pre-req Chain */}
+            {activeWorkspaceView === 'prereq' && (
+              <div className="pl-4 space-y-0.5 border-l border-[#ebebeb] dark:border-[#222222] ml-4 my-1">
+                {(
+                  [
+                    { id: 'ALL', label: 'All Chains' },
+                    { id: 'CSE', label: 'CSE' },
+                    { id: 'MNS', label: 'MNS' },
+                    { id: 'ENG', label: 'ENG' },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setPrereqDeptFilter(item.id)}
+                    className={`w-full px-2 py-1.5 rounded-md text-[11px] flex items-center gap-2 transition-all cursor-pointer ${
+                      prereqDeptFilter === item.id
+                        ? "text-[#0070f3] font-semibold bg-[#0070f3]/10"
+                        : "text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414]"
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Academic Tools & Modals */}
@@ -3894,15 +4048,6 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setShowPrereqChainsModal(true)}
-                className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
-              >
-                <GitBranch className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>Pre-req Chain</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setShowRoiModal(true)}
                 className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
               >
@@ -3912,11 +4057,11 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setShowRoadmapModal(true)}
+                onClick={() => setShowAcademicGuideModal(true)}
                 className="w-full px-2.5 py-2 rounded-lg text-xs font-medium text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center gap-2.5 transition-all cursor-pointer"
               >
                 <Compass className="h-4 w-4 text-rose-500 shrink-0" />
-                <span>Curriculum Roadmap</span>
+                <span>Curriculum &amp; Grading</span>
               </button>
 
               <button
@@ -3939,7 +4084,7 @@ export default function Home() {
               >
                 <span className="flex items-center gap-2.5">
                   <Menu className="h-4 w-4 text-[#888888] shrink-0" />
-                  <span>Backups &amp; Reset</span>
+                  <span>Data &amp; Cloud Sync</span>
                 </span>
                 <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
               </button>
@@ -3983,190 +4128,233 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* 2. Slide-out Drawer: Where Extra Things Go (Backups, Snapshot, Roadmap, Reset) */}
+      {/* Module 1: Data, Backups & Cloud Sync */}
       {isExtraSidebarOpen && (
-        <>
-          {/* Backdrop on small screens */}
-          <div 
-            onClick={() => setIsExtraSidebarOpen(false)}
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
-          />
-
-          <div className="fixed top-0 left-0 lg:left-56 h-screen w-80 sm:w-88 bg-white dark:bg-[#0a0a0a] border-r border-[#ebebeb] dark:border-[#262626] z-50 p-6 flex flex-col justify-between shadow-vercel-modal animate-in slide-in-from-left duration-200 overflow-y-auto">
-            <div className="space-y-6">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#262626] pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-md bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
-                    <Menu className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm tracking-tight text-[#171717] dark:text-[#ededed]">Tools &amp; Utilities</h3>
-                    <p className="text-[11px] text-[#888888]">Curriculum utilities &amp; backups</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsExtraSidebarOpen(false)}
-                  className="h-7 w-7 rounded-md bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center cursor-pointer transition"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+        <div
+          onClick={() => setIsExtraSidebarOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
+          >
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
               </div>
-
-              {/* Backup & Progress Actions */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888] px-1 block mb-1">Data &amp; Backups</span>
-                
-                {/* Export JSON */}
-                <button
-                  type="button"
-                  onClick={handleExportBackup}
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                    <Download className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Export JSON Backup</p>
-                    <p className="text-[11px] text-[#888888]">Save curriculum state locally</p>
-                  </div>
-                </button>
-
-                {/* Restore JSON */}
-                <label className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group">
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                    <Upload className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Restore JSON Backup</p>
-                    <p className="text-[11px] text-[#888888]">Load from .json file</p>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={(e) => {
-                      handleImportBackup(e);
-                      setIsExtraSidebarOpen(false);
-                    }}
-                    className="hidden"
-                  />
-                </label>
-
-                {/* Snapshot Progress */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowGradeSheetModal(true);
-                    setIsExtraSidebarOpen(false);
-                  }}
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                    <Camera className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Snapshot Progress PNG</p>
-                    <p className="text-[11px] text-[#888888]">High-resolution summary card</p>
-                  </div>
-                </button>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/data-sync</span>
               </div>
-
-              {/* Academic Utilities */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888] px-1 block mb-1">Academic Utilities</span>
-
-                {/* Pre-req Chain Sequence Viewer */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPrereqChainsModal(true);
-                    setIsExtraSidebarOpen(false);
-                  }}
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-emerald-500 shrink-0">
-                    <GitBranch className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Pre-req Chain</p>
-                    <p className="text-[11px] text-[#888888]">CSE &amp; MNS sequence progress</p>
-                  </div>
-                </button>
-
-                {/* Feeling Lost Roadmap */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRoadmapModal(true);
-                    setIsExtraSidebarOpen(false);
-                  }}
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                    <HelpCircle className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Curriculum Roadmap</p>
-                    <p className="text-[11px] text-[#888888]">Interactive CSE flowchart</p>
-                  </div>
-                </button>
-
-                {/* Sample OBE Curriculum (Version 2023) Link */}
-                <a
-                  href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors truncate">Sample OBE Curriculum (2023)</p>
-                      <p className="text-[11px] text-[#888888] truncate">Official Google Doc syllabus</p>
-                    </div>
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-[#888888] group-hover:text-[#0070f3] transition-colors shrink-0" />
-                </a>
-
-                {/* Grading System Scale */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowGradingSystemModal(true);
-                    setIsExtraSidebarOpen(false);
-                  }}
-                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
-                >
-                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
-                    <Award className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">BRACU Grading Scale</p>
-                    <p className="text-[11px] text-[#888888]">Grade points &amp; marks range</p>
-                  </div>
-                </button>
-              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                DATA &amp; SYNC
+              </span>
             </div>
 
-            {/* Drawer Bottom: Reset Plan */}
-            <div className="pt-4 border-t border-[#ebebeb] dark:border-[#262626]">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3]">
+                  <Cloud className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm tracking-tight">Data, Backups &amp; Cloud Sync</h3>
+                  <p className="text-[11px] text-[#888888]">Export, restore, cloud sync &amp; reset</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExtraSidebarOpen(false)}
+                className="h-7 w-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-2.5">
+              {/* Export JSON */}
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
+              >
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center shrink-0">
+                  <Download className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors">Export JSON Backup</p>
+                  <p className="text-[11px] text-[#888888]">Save curriculum state locally</p>
+                </div>
+              </button>
+
+              {/* Restore JSON */}
+              <label className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group">
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center shrink-0">
+                  <Upload className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors">Restore JSON Backup</p>
+                  <p className="text-[11px] text-[#888888]">Load from .json file</p>
+                </div>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => {
+                    handleImportBackup(e);
+                    setIsExtraSidebarOpen(false);
+                  }}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Cloud Sync */}
               <button
                 type="button"
                 onClick={() => {
-                  setShowResetConfirm(true);
                   setIsExtraSidebarOpen(false);
+                  setShowCloudModal(true);
                 }}
-                className="w-full p-2.5 rounded-lg bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-[#ee0000] flex items-center justify-center gap-2 transition cursor-pointer"
+                className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
               >
-                <RotateCcw className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-xs font-medium">Reset Plan to Default</span>
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Cloud className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors">
+                    {cloudUser ? `Cloud Sync (${cloudUser.name})` : "Cloud Sync & Backups"}
+                  </p>
+                  <p className="text-[11px] text-[#888888]">
+                    {cloudUser ? "Manage synced snapshots across devices" : "Sign in to sync your curriculum"}
+                  </p>
+                </div>
+              </button>
+
+              {/* Reset Plan */}
+              <div className="pt-2 border-t border-[#ebebeb] dark:border-[#222222]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetConfirm(true);
+                    setIsExtraSidebarOpen(false);
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-[#ee0000] flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-xs font-medium">Reset Plan to Default</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Module 2: Curriculum & Grading Guide */}
+      {showAcademicGuideModal && (
+        <div
+          onClick={() => setShowAcademicGuideModal(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
+          >
+            {/* Window Chrome Bar */}
+            <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+              </div>
+              <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>route136.app/curriculum-guide</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                ACADEMIC GUIDE
+              </span>
+            </div>
+
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-rose-500">
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm tracking-tight">Curriculum &amp; Grading Guide</h3>
+                  <p className="text-[11px] text-[#888888]">Roadmap, OBE syllabus &amp; BRACU grading scale</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAcademicGuideModal(false)}
+                className="h-7 w-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-2.5">
+              {/* Curriculum Roadmap */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoadmapModal(true);
+                  setShowAcademicGuideModal(false);
+                }}
+                className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
+              >
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Compass className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors">Curriculum Roadmap</p>
+                  <p className="text-[11px] text-[#888888]">136-credit degree distribution guide</p>
+                </div>
+              </button>
+
+              {/* Sample OBE Curriculum (Version 2023) */}
+              <a
+                href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors truncate">Sample OBE Curriculum (2023)</p>
+                    <p className="text-[11px] text-[#888888] truncate">Official Google Doc syllabus</p>
+                  </div>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 text-[#888888] group-hover:text-[#0070f3] transition-colors shrink-0" />
+              </a>
+
+              {/* BRACU Grading Scale */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGradingSystemModal(true);
+                  setShowAcademicGuideModal(false);
+                }}
+                className="w-full p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
+              >
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-amber-500 shrink-0">
+                  <Award className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium group-hover:text-[#0070f3] transition-colors">BRACU Grading Scale</p>
+                  <p className="text-[11px] text-[#888888]">Grade points &amp; marks range</p>
+                </div>
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* 3. Mobile Header (< 1024px) */}
@@ -4848,7 +5036,13 @@ export default function Home() {
               </div>
               <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span>route136.app/workspace</span>
+                <span>
+                  {activeWorkspaceView === 'performance'
+                    ? 'route136.app/performance'
+                    : activeWorkspaceView === 'prereq'
+                    ? 'route136.app/prereq-chains'
+                    : 'route136.app/workspace'}
+                </span>
               </div>
               <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded font-medium">
                 136-CR ENGINE
@@ -4856,6 +5050,28 @@ export default function Home() {
             </div>
 
             <div className="p-4 sm:p-6 lg:p-7 flex flex-col gap-6">
+              {/* Mobile/Tablet 3-Feature Switcher (visible when left sidebar is hidden) */}
+              <div className="flex lg:hidden items-center gap-1.5 p-1 rounded-xl bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#242424] overflow-x-auto">
+                {[
+                  { id: 'tracker' as const, label: 'Course Tracker' },
+                  { id: 'performance' as const, label: 'Course Performance' },
+                  { id: 'prereq' as const, label: 'Pre-req Chain' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveWorkspaceView(tab.id)}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer ${
+                      activeWorkspaceView === tab.id
+                        ? "bg-white dark:bg-[#242424] text-[#171717] dark:text-[#ededed] font-semibold shadow-vercel-subtle"
+                        : "text-[#666666] dark:text-[#888888]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Bento Container Top Bar: Workspace Status & Direct Action Buttons */}
               <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5 border-b border-[#ebebeb] dark:border-[#222222] pb-4">
               {/* Left: Workspace Title & Live Credit / CGPA Badges */}
@@ -4863,9 +5079,22 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#0070f3]" />
                   <h1 className="text-sm sm:text-base font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
-                    Degree Workspace
+                    {activeWorkspaceView === 'performance'
+                      ? 'Course Performance'
+                      : activeWorkspaceView === 'prereq'
+                      ? 'Pre-req Chain'
+                      : 'Degree Workspace'}
                   </h1>
                 </div>
+                {activeWorkspaceView !== 'tracker' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveWorkspaceView('tracker')}
+                    className="px-2.5 py-1 rounded-full bg-[#f5f5f5] dark:bg-[#161616] hover:bg-[#eaeaea] dark:hover:bg-[#222222] border border-[#ebebeb] dark:border-[#262626] text-[11px] font-mono text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
+                  >
+                    ← Back to Tracker
+                  </button>
+                )}
                 <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-vercel-subtle">
                   <BadgeCheck className="h-3.5 w-3.5 text-[#0070f3]" />
                   <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-[#ededed]">
@@ -4880,7 +5109,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Right: Direct 1-Click Action Buttons (+ Add Courses, Roadmap, Snapshot, Tools) */}
+              {/* Right: Direct 1-Click Action Buttons (+ Add Courses, Pre-req Chain, Roadmap, Snapshot, Tools) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
@@ -4897,8 +5126,12 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => setShowPrereqChainsModal(true)}
-                  className="h-8 px-3 bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setActiveWorkspaceView(prev => prev === 'prereq' ? 'tracker' : 'prereq')}
+                  className={`h-8 px-3 border font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer ${
+                    activeWorkspaceView === 'prereq'
+                      ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                      : "bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]"
+                  }`}
                   title="Open CSE & MNS Prerequisite Sequence Chains"
                 >
                   <GitBranch className="h-3.5 w-3.5 text-emerald-500" />
@@ -4936,6 +5169,48 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {activeWorkspaceView === 'performance' && (
+              <CoursePerformanceWorkspace
+                embedded={true}
+                semestersProp={semesters}
+                currentSemesterNumber={onboardingData?.currentSemesterNumber}
+                activeTabProp={performanceTab}
+                onTabChange={setPerformanceTab}
+                onGradeSynced={(semId, code, grade) => {
+                  const next = semesters.map((s) =>
+                    s.id === semId
+                      ? {
+                          ...s,
+                          courses: s.courses.map((c) =>
+                            c.code === code ? { ...c, grade, isCompleted: true } : c
+                          ),
+                        }
+                      : s
+                  );
+                  updateSemesters(next);
+                }}
+              />
+            )}
+
+            {activeWorkspaceView === 'prereq' && (
+              <PrereqChainsModal
+                isOpen={true}
+                embedded={true}
+                onClose={() => setActiveWorkspaceView('tracker')}
+                semesters={semesters}
+                isCSE400Passed={isCSE400Passed}
+                deptFilterProp={prereqDeptFilter}
+                onDeptFilterChange={setPrereqDeptFilter}
+                onQuickAddCourse={(code) => {
+                  setAddCoursesPreselected([code]);
+                  setAddCoursesTargetSemesterId(null);
+                  setIsAddCoursesModalOpen(true);
+                }}
+              />
+            )}
+
+            {activeWorkspaceView === 'tracker' && (<>
 
             {/* Alerts */}
             {mode === 'gpa' && (
@@ -5967,6 +6242,7 @@ export default function Home() {
               onToggle={() => setIsCapstoneCollapsed(prev => !prev)} 
             />
           </div>
+          </>)}
           </div>
       </div>
 
@@ -7013,17 +7289,6 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <a
-                    href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="h-8 inline-flex items-center gap-1.5 px-3 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] rounded-lg text-xs font-medium transition shadow-vercel-subtle active:scale-95 cursor-pointer whitespace-nowrap"
-                    title="Open Sample OBE Curriculum (Version 2023)"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Sample OBE Curriculum</span>
-                    <ExternalLink className="h-3 w-3 opacity-80" />
-                  </a>
                   <button 
                     onClick={() => {
                       setShowRoadmapModal(false);

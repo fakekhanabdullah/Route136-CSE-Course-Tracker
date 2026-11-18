@@ -53,10 +53,10 @@ Planning a **136-credit** BRACU CSE degree means juggling multi-tier prerequisit
 
 | Capability | Badge | Description |
 | :--- | :--- | :--- |
-| **Interactive Prerequisite Chains** | `PRE-REQ CHAIN` | Visualize every **CSE**, **MNS**, **BIL**, and **Major Elective** sequence in one flowchart. Track **`X / Y Completed • Z Left`** per chain, spot **`Ready Next`** courses, and inspect Hard (`HP`) / Soft (`SP`) prerequisites. |
-| **Semester Performance Charts** | `TRAJECTORY` | Interactive term-by-term **SGPA bar chart** with an editable graduation **Target Goal** reference line (`Goal: 3.50`) in the header, peak semester highlight, and 1-click **Quick Grade Entry**. |
-| **Target CGPA Solver & Retake ROI** | `TRAJECTORY ENGINE` | Compute the exact GPA required across remaining credits to hit your target CGPA, and simulate single or multi-course retakes ranked by exact cumulative CGPA boost. |
-| **Multi-Semester Course Builder** | `COURSE PICKER` | Horizontal semester tab switcher (`Sem 1`, `Sem 2`, `RS`, etc.) to populate multiple semesters in one session—including **in-batch Retake / Repeat Course** confirmation across terms. |
+| **Interactive Prerequisite Chains** | `PRE-REQ CHAIN` | Visualize every **CSE**, **MNS**, **ENG**, and **Major Elective** sequence inside the main workspace (with `All`, `CSE`, `MNS`, `ENG` filters), track **`X / Y Completed • Z Left`**, and inspect Hard (`HP`) / Soft (`SP`) prerequisites. |
+| **Course Performance & Attendance Studio** | `PERFORMANCE STUDIO` | Spreadsheet-style **Mark Distribution** (Quizzes with `N-1`/`N-2`/Best-K & per-item score conversion, Lab Reports, Assignments, Mid/Final) + **70% Theory / 90% Lab Attendance Tracker** with `dd/mm/yyyy` logs, GitHub-style bars, and opt-in grade sync. |
+| **CGPA Charts, Solver & Retake ROI** | `TRAJECTORY ENGINE` | Interactive term-by-term **SGPA bar chart** with an editable graduation **Target Goal** reference line, required future GPA solver, and single/multi-course retake CGPA boost ranking. |
+| **Multi-Semester & Manual Course Builder** | `COURSE PICKER` | Horizontal semester tab switcher (`Sem 1`, `Sem 2`, `RS`, etc.) with **in-batch Retake / Repeat Course** confirmation and **Manual Course Creation** when searching for unlisted courses. |
 | **3-Step Timeline Setup Wizard** | `12-SEM PLANNER` | Pick your Current Semester (`1st`–`12th`), Starting Intake, and flexible **RS placement** (including custom semester # or *Not Sure Yet*), with inline `ENG102` / `BU201` RS selection. |
 | **Updated 136-Credit OBE Roadmap** | `SYLLABUS` | Color-coded **Curriculum Roadmap** aligned with the updated BRACU CSE Degree Plan—covering Program Core (with `CSE110`/`CSE260` cross-listings), School Core, 5 GenEd Streams, and 2 Free GenEd Electives. |
 | **Grade Sheet PNG Snapshot** | `EXPORT` | High-resolution dark-mode transcript snapshot featuring combined **Degree Progress & CGPA**, detailed **Core/MNS/Electives/Thesis** & **GenEd** progress bars, coursework table, and developer attribution. |
@@ -147,18 +147,23 @@ Route136-CSE-Course-Tracker/
 │   │   ├── icon.svg                       # Next.js App Router white favicon
 │   │   ├── layout.tsx                     # Root layout, Geist fonts, theme hydration & metadata
 │   │   ├── page.tsx                       # Landing page, 3-step setup wizard, workspace & modals
+│   │   ├── performance/page.tsx           # Standalone Course Performance & Attendance Studio route
+│   │   ├── prereq-chains/page.tsx         # Standalone full-screen Pre-req Chain Explorer route
 │   │   ├── privacy/page.tsx               # Privacy Policy (dark/light persisted)
 │   │   └── terms/page.tsx                 # Terms of Service (dark/light persisted)
 │   ├── components/
-│   │   ├── AddCoursesModal.tsx            # Multi-semester course builder with in-batch retakes
+│   │   ├── AddCoursesModal.tsx            # Multi-semester course builder + manual course creation
 │   │   ├── AddSemesterModal.tsx           # Focused semester editor modal
 │   │   ├── CgpaSemesterGraph.tsx          # Semester performance SGPA chart + editable goal
+│   │   ├── CoursePerformanceWorkspace.tsx # Mark distribution spreadsheet & 70%/90% attendance tracker
+│   │   ├── LandingFeatureShowcase.tsx     # Interactive 5-slide landing page feature showcase
 │   │   ├── MobileBottomNav.tsx            # Responsive mobile navigation dock
-│   │   ├── PrereqChainsModal.tsx          # Interactive CSE/MNS/BIL prerequisite chain viewer
+│   │   ├── PrereqChainsModal.tsx          # Interactive CSE/MNS/ENG prerequisite chain viewer
 │   │   ├── QuickGradeCarouselModal.tsx    # Term-by-term carousel for rapid grade entry
 │   │   ├── SpeedDialMenu.tsx              # Mobile quick-action sheet
 │   │   └── ThemeToggleButton.tsx          # Shared Dark/Light theme switcher
 │   └── lib/
+│       ├── coursePerformance.ts           # Attendance, N-1/N-2 & mark conversion calculation engine
 │       └── googleDriveSync.ts             # Google OAuth 2.0 gatekeeper & Drive v3 AppData client
 ├── package.json                           # Next.js 16.4.6, React 19.2.4, Tailwind CSS v4
 └── tsconfig.json                          # Strict TypeScript configuration

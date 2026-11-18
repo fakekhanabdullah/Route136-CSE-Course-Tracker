@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { X, Search, Check, Layers, AlertTriangle, BookOpen, Trash2, ChevronDown, ChevronUp, Plus, ArrowRight, Repeat } from "lucide-react";
-import { COURSES } from "@/app/courses-data";
+import { COURSES, registerCustomCourse } from "@/app/courses-data";
 
 interface SelectedCourse {
   code: string;
@@ -76,6 +76,14 @@ export default function AddCoursesModal({
     sourceType: 'queued' | 'enrolled';
   } | null>(null);
 
+  // Manual/Custom Course form state when search returns no matches
+  const [showCustomForm, setShowCustomForm] = useState<boolean>(false);
+  const [customCode, setCustomCode] = useState<string>("");
+  const [customTitle, setCustomTitle] = useState<string>("");
+  const [customCredits, setCustomCredits] = useState<number>(3);
+  const [customCategory, setCustomCategory] = useState<string>("CSE Major Elective");
+  const [customCourseVersion, setCustomCourseVersion] = useState<number>(0);
+
   // Helper to determine the best default semester to assign to
   const getDefaultSemesterId = () => {
     if (!semesters || semesters.length === 0) return "";
@@ -110,6 +118,11 @@ export default function AddCoursesModal({
       setCategoryFilter("ALL");
       setShowClearConfirm(false);
       setRepeatPrompt(null);
+      setShowCustomForm(false);
+      setCustomCode("");
+      setCustomTitle("");
+      setCustomCredits(3);
+      setCustomCategory("CSE Major Elective");
     }
   }, [isOpen, initialSelectedCodes, initialTargetSemesterId]);
 
@@ -175,7 +188,35 @@ export default function AddCoursesModal({
 
       return true;
     }).slice(0, 60);
-  }, [searchQuery, categoryFilter]);
+  }, [searchQuery, categoryFilter, customCourseVersion]);
+
+  const handleOpenCustomForm = () => {
+    const guessCode = searchQuery.trim().toUpperCase().replace(/\s+/g, "");
+    setCustomCode(guessCode);
+    setCustomTitle("");
+    setCustomCredits(3);
+    setCustomCategory("CSE Major Elective");
+    setShowCustomForm(true);
+  };
+
+  const handleCreateAndQueueCustomCourse = (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalizedCode = customCode.trim().toUpperCase();
+    if (!normalizedCode) return;
+
+    registerCustomCourse({
+      code: normalizedCode,
+      title: customTitle.trim() || `Custom Course (${normalizedCode})`,
+      credits: customCategory === "Non-Credit" ? 0 : customCredits,
+      category: customCategory,
+      mandatory: false,
+    });
+    setCustomCourseVersion(v => v + 1);
+    setShowCustomForm(false);
+    setSearchQuery("");
+    setCategoryFilter("ALL");
+    toggleSelectCourse(normalizedCode);
+  };
 
   if (!isOpen) return null;
 
@@ -747,7 +788,149 @@ export default function AddCoursesModal({
               </div>
             </div>
 
-            {/* Course Catalog Grid */}
+            {/* Course Catalog Grid or Empty-Search Manual Course Builder */}
+            {filteredCourses.length === 0 ? (
+              <div className="p-5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-dashed border-[#d4d4d8] dark:border-[#2a2a2a] space-y-4">
+                {!showCustomForm ? (
+                  <div className="text-center space-y-3 py-2">
+                    <div className="mx-auto h-9 w-9 rounded-lg bg-white dark:bg-[#181818] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#888888]">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs sm:text-sm font-semibold text-[#171717] dark:text-[#ededed]">
+                        Couldn&apos;t find what you are looking for?
+                      </p>
+                      <p className="text-xs text-[#666666] dark:text-[#888888]">
+                        No courses matched {searchQuery ? <strong className="font-mono text-[#171717] dark:text-[#ededed]">&quot;{searchQuery}&quot;</strong> : "your filter"}. Would you like to add it manually?
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenCustomForm}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-semibold shadow-vercel-subtle transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Course Manually</span>
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleCreateAndQueueCustomCourse} className="space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2.5">
+                      <div>
+                        <h4 className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">
+                          Add Manual Course
+                        </h4>
+                        <p className="text-[11px] text-[#666666] dark:text-[#888888]">
+                          Enter the course code, credits, and category to add it to {currentReviewSemester?.name || "this semester"}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomForm(false)}
+                        className="text-xs text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-[#888888]">
+                          Course Code *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customCode}
+                          onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. BUS101 or CSE499"
+                          className="w-full h-9 px-3 rounded-lg bg-white dark:bg-[#161616] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs font-mono text-[#171717] dark:text-[#ededed] focus:outline-none focus:border-[#0070f3]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-[#888888]">
+                          Course Title (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={customTitle}
+                          onChange={(e) => setCustomTitle(e.target.value)}
+                          placeholder="e.g. Special Topics"
+                          className="w-full h-9 px-3 rounded-lg bg-white dark:bg-[#161616] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs text-[#171717] dark:text-[#ededed] focus:outline-none focus:border-[#0070f3]"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-[#888888]">
+                          Credits
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {[0, 1, 2, 3, 4].map((cr) => (
+                            <button
+                              key={cr}
+                              type="button"
+                              onClick={() => setCustomCredits(cr)}
+                              className={`flex-1 h-9 rounded-lg font-mono text-xs font-semibold border transition cursor-pointer ${
+                                (customCategory === "Non-Credit" ? 0 : customCredits) === cr
+                                  ? "bg-[#0070f3] border-[#0070f3] text-white"
+                                  : "bg-white dark:bg-[#161616] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#666666] dark:text-[#a1a1a1] hover:border-[#888888]"
+                              }`}
+                            >
+                              {cr}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono uppercase tracking-wider text-[#888888]">
+                          Course Type / Category
+                        </label>
+                        <select
+                          value={customCategory}
+                          onChange={(e) => {
+                            const nextCat = e.target.value;
+                            setCustomCategory(nextCat);
+                            if (nextCat === "Non-Credit") setCustomCredits(0);
+                            else if (customCredits === 0) setCustomCredits(3);
+                          }}
+                          className="w-full h-9 px-3 rounded-lg bg-white dark:bg-[#161616] border border-[#e5e5e5] dark:border-[#2a2a2a] text-xs text-[#171717] dark:text-[#ededed] focus:outline-none focus:border-[#0070f3]"
+                        >
+                          <option value="CSE Program Core">CSE Program Core</option>
+                          <option value="School Core (Math & Sciences)">School Core (Math &amp; Sciences)</option>
+                          <option value="CSE Major Elective">CSE Major Elective</option>
+                          <option value="GenEd Stream 1">GenEd Stream 1 (Writing)</option>
+                          <option value="GenEd Stream 2">GenEd Stream 2 (Math &amp; Sciences)</option>
+                          <option value="GenEd Stream 3">GenEd Stream 3 (Arts &amp; Humanities)</option>
+                          <option value="GenEd Stream 4">GenEd Stream 4 (Social Sciences)</option>
+                          <option value="GenEd Stream 5">GenEd Stream 5 (CST)</option>
+                          <option value="Non-Credit">Non-Credit / Remedial</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomForm(false)}
+                        className="h-8 px-3 rounded-lg text-xs font-medium border border-[#e5e5e5] dark:border-[#2a2a2a] bg-white dark:bg-[#161616] text-[#666666] dark:text-[#a1a1a1] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!customCode.trim()}
+                        className="h-8 px-4 rounded-lg bg-[#0070f3] hover:bg-[#0060df] text-white text-xs font-semibold transition disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add &amp; Queue Course</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
               {filteredCourses.map(course => {
                 const queuedForThisCourse = queuedItems.filter(q => q.courseCode === course.code);
@@ -823,6 +1006,7 @@ export default function AddCoursesModal({
                 );
               })}
             </div>
+            )}
           </div>
         </div>
 

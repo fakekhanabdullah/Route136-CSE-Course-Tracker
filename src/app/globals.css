@@ -142,3 +142,70 @@ body {
   scrollbar-width: none;
 }
 
+/* Minimal Tech Background Animations (GPU-composited) */
+@keyframes route136-trace-x {
+  0% {
+    transform: translateX(-25%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+  }
+  85% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(125%);
+    opacity: 0;
+  }
+}
+
+@keyframes route136-trace-y {
+  0% {
+    transform: translateY(-25%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.65;
+  }
+  85% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateY(125%);
+    opacity: 0;
+  }
+}
+
+@keyframes route136-spotlight-pulse {
+  0%, 100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.06);
+    opacity: 1;
+  }
+}
+
+.animate-trace-x-slow {
+  animation: route136-trace-x 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-trace-x-delayed {
+  animation: route136-trace-x 12s cubic-bezier(0.4, 0, 0.2, 1) 4s infinite;
+}
+
+.animate-trace-y-slow {
+  animation: route136-trace-y 11s cubic-bezier(0.4, 0, 0.2, 1) 2s infinite;
+}
+
+.animate-trace-y-delayed {
+  animation: route136-trace-y 14s cubic-bezier(0.4, 0, 0.2, 1) 6s infinite;
+}
+
+.animate-spotlight-breathe {
+  animation: route136-spotlight-pulse 8s ease-in-out infinite;
+}
+
+

@@ -137,6 +137,10 @@ interface PrereqChainsModalProps {
   semesters: Semester[];
   isCSE400Passed: boolean;
   onQuickAddCourse?: (courseCode: string) => void;
+  isFullPage?: boolean;
+  embedded?: boolean;
+  deptFilterProp?: 'ALL' | 'CSE' | 'MNS' | 'ENG';
+  onDeptFilterChange?: (filter: 'ALL' | 'CSE' | 'MNS' | 'ENG') => void;
 }
 
 export default function PrereqChainsModal({
@@ -145,9 +149,18 @@ export default function PrereqChainsModal({
   semesters,
   isCSE400Passed,
   onQuickAddCourse,
+  isFullPage = false,
+  embedded = false,
+  deptFilterProp,
+  onDeptFilterChange,
 }: PrereqChainsModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [deptFilter, setDeptFilter] = useState<'ALL' | 'CSE' | 'MNS' | 'ENG'>('ALL');
+  const [internalDeptFilter, setInternalDeptFilter] = useState<'ALL' | 'CSE' | 'MNS' | 'ENG'>('ALL');
+  const deptFilter = deptFilterProp ?? internalDeptFilter;
+  const setDeptFilter = (next: 'ALL' | 'CSE' | 'MNS' | 'ENG') => {
+    setInternalDeptFilter(next);
+    if (onDeptFilterChange) onDeptFilterChange(next);
+  };
   const [selectedCourseInspector, setSelectedCourseInspector] = useState<string | null>(null);
 
   // Compute completion & planned map across all user semesters
@@ -284,14 +297,27 @@ export default function PrereqChainsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
-      onClick={onClose}
+      className={
+        embedded
+          ? "w-full flex flex-col text-[#171717] dark:text-[#ededed]"
+          : isFullPage
+          ? "min-h-screen w-full flex flex-col bg-[#fafafa] dark:bg-[#050505] text-[#171717] dark:text-[#ededed]"
+          : "fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+      }
+      onClick={isFullPage || embedded ? undefined : onClose}
     >
       <div
-        className="w-full max-w-[96vw] md:max-w-6xl max-h-[94vh] flex flex-col bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
-        onClick={e => e.stopPropagation()}
+        className={
+          embedded
+            ? "w-full flex flex-col bg-transparent overflow-hidden text-[#171717] dark:text-[#ededed]"
+            : isFullPage
+            ? "w-full flex-1 flex flex-col bg-white dark:bg-[#0c0c0c] overflow-hidden text-[#171717] dark:text-[#ededed]"
+            : "w-full max-w-[96vw] md:max-w-6xl max-h-[94vh] flex flex-col bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
+        }
+        onClick={isFullPage || embedded ? undefined : (e) => e.stopPropagation()}
       >
-        {/* Window Chrome Bar */}
+        {/* Window Chrome Bar (hidden when embedded inside main Degree Workspace frame) */}
+        {!embedded && (
         <div className="px-4 py-2 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
@@ -306,6 +332,7 @@ export default function PrereqChainsModal({
             DEPENDENCY ENGINE
           </span>
         </div>
+        )}
 
         {/* Header Bar */}
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 bg-white dark:bg-[#0c0c0c] shrink-0">
@@ -374,7 +401,7 @@ export default function PrereqChainsModal({
                       : 'text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
                   }`}
                 >
-                  {tab === 'ALL' ? 'All Chains' : tab}
+                  {tab === 'ALL' ? 'All' : tab}
                 </button>
               ))}
             </div>
@@ -645,16 +672,16 @@ export default function PrereqChainsModal({
             <span><strong>HP (Hard Prereq):</strong> Must complete before next course</span>
             <span>•</span>
             <span><strong>SP (Soft Prereq):</strong> Advisory course that helps with next course</span>
-            <span>•</span>
-            <span>Click any course box to inspect or add to your plan</span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-8 px-4 rounded-lg bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-medium text-xs shadow-vercel-subtle cursor-pointer transition shrink-0"
-          >
-            Done
-          </button>
+          {!embedded && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-8 px-4 rounded-lg bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] font-medium text-xs shadow-vercel-subtle cursor-pointer transition shrink-0"
+            >
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>
