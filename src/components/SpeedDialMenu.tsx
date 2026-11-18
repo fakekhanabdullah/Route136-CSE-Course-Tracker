@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Plus, X, Layers, BookPlus, Award, Sparkles, ChevronUp } from "lucide-react";
+import { Plus, X, Layers, BookPlus, Award, Zap } from "lucide-react";
 
 interface SpeedDialMenuProps {
   onAddSemester: () => void;
@@ -64,46 +64,46 @@ export default function SpeedDialMenu({
     if (!isOpen) return null;
     return (
       <div 
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150"
         onClick={handleClose}
       >
         <div 
-          className="w-full max-w-sm bg-[#070712] border border-white/[0.1] rounded-3xl p-5 shadow-[0_0_50px_rgba(59,130,246,0.25)] space-y-4 animate-in slide-in-from-bottom duration-300"
+          className="w-full max-w-sm bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl p-5 shadow-vercel-modal space-y-4 animate-in slide-in-from-bottom duration-200 text-[#171717] dark:text-[#ededed]"
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+          <div className="flex items-center justify-between pb-2 border-b border-[#ebebeb] dark:border-[#262626]">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-md bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] flex items-center justify-center">
+                <Zap className="w-4 h-4" />
               </div>
-              <h3 className="font-bold text-white text-base">Quick Action</h3>
+              <h3 className="font-semibold text-sm">Quick Actions</h3>
             </div>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-white/5 transition-colors"
+              className="p-1 rounded-md text-[#888888] hover:text-[#171717] dark:hover:text-white bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {/* Action 1: Add Semester */}
             <button
               onClick={() => {
                 handleClose();
                 onAddSemester();
               }}
-              className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#090914] hover:bg-[#0d0d1e] border border-white/[0.08] hover:border-indigo-500/35 text-left transition-all active:scale-98 shadow-sm group cursor-pointer"
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-left transition shadow-vercel-subtle group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform">
-                <Layers className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white shrink-0">
+                <Layers className="w-4 h-4" />
               </div>
-              <div className="flex-1">
-                <div className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs text-[#171717] dark:text-white group-hover:text-[#0070f3] transition-colors">
                   Add Semester
                 </div>
-                <div className="text-xs text-slate-400">
-                  Create new semester &amp; search courses
+                <div className="text-[11px] text-[#888888] truncate">
+                  Create term &amp; open course search
                 </div>
               </div>
             </button>
@@ -114,16 +114,16 @@ export default function SpeedDialMenu({
                 handleClose();
                 onAddCourses();
               }}
-              className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#090914] hover:bg-[#0d0d1e] border border-white/[0.08] hover:border-indigo-500/35 text-left transition-all active:scale-98 shadow-sm group cursor-pointer"
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-left transition shadow-vercel-subtle group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform">
-                <BookPlus className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white shrink-0">
+                <BookPlus className="w-4 h-4" />
               </div>
-              <div className="flex-1">
-                <div className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-xs text-[#171717] dark:text-white group-hover:text-[#0070f3] transition-colors">
                   Add Courses
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-[11px] text-[#888888] truncate">
                   Pick courses &amp; assign to semesters
                 </div>
               </div>
@@ -135,23 +135,23 @@ export default function SpeedDialMenu({
                 handleClose();
                 onQuickGrades();
               }}
-              className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#090914] hover:bg-[#0d0d1e] border border-white/[0.08] hover:border-indigo-500/35 text-left transition-all active:scale-98 shadow-sm group cursor-pointer"
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-left transition shadow-vercel-subtle group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-400/30 flex items-center justify-center text-indigo-300 group-hover:scale-110 transition-transform">
-                <Award className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white shrink-0">
+                <Award className="w-4 h-4" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white group-hover:text-blue-300 transition-colors">
+                  <span className="font-medium text-xs text-[#171717] dark:text-white group-hover:text-[#0070f3] transition-colors">
                     Quick Grade Entry
                   </span>
                   {isCgpaMode && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/25 text-indigo-300 border border-indigo-400/40">
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0070f3] border border-blue-500/20">
                       CGPA
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-[11px] text-[#888888] truncate">
                   Slide across semesters to assign grades
                 </div>
               </div>
@@ -167,9 +167,9 @@ export default function SpeedDialMenu({
     <div ref={menuRef} className="fixed bottom-6 right-6 z-40 hidden md:block">
       {/* Expanded Speed Dial Menu */}
       {isOpen && (
-        <div className="absolute bottom-16 right-0 mb-2 w-64 p-2.5 rounded-2xl bg-[#070712]/95 backdrop-blur-xl border border-white/[0.1] shadow-[0_0_35px_rgba(59,130,246,0.25)] space-y-1.5 animate-in slide-in-from-bottom-4 duration-200">
-          <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-300/80 border-b border-white/[0.08] mb-1">
-            Actions
+        <div className="absolute bottom-16 right-0 mb-2 w-60 p-2 rounded-xl bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] shadow-vercel-modal space-y-1 animate-in slide-in-from-bottom-2 duration-150 text-[#171717] dark:text-[#ededed]">
+          <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[#888888] border-b border-[#ebebeb] dark:border-[#262626] mb-1">
+            Quick Actions
           </div>
 
           <button
@@ -177,14 +177,14 @@ export default function SpeedDialMenu({
               handleClose();
               onAddSemester();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-500/15 text-left text-zinc-200 hover:text-white transition-all group cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#fafafa] dark:hover:bg-[#141414] text-left text-[#171717] dark:text-[#ededed] transition-all group cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Layers className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+              <Layers className="w-3.5 h-3.5" />
             </div>
             <div>
-              <div className="text-xs font-bold">Add Semester</div>
-              <div className="text-[10px] text-zinc-400">Add term &amp; open course search</div>
+              <div className="text-xs font-medium">Add Semester</div>
+              <div className="text-[10px] text-[#888888]">Create term &amp; enroll courses</div>
             </div>
           </button>
 
@@ -193,14 +193,14 @@ export default function SpeedDialMenu({
               handleClose();
               onAddCourses();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-500/15 text-left text-zinc-200 hover:text-white transition-all group cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#fafafa] dark:hover:bg-[#141414] text-left text-[#171717] dark:text-[#ededed] transition-all group cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <BookPlus className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+              <BookPlus className="w-3.5 h-3.5" />
             </div>
             <div>
-              <div className="text-xs font-bold">Add Courses</div>
-              <div className="text-[10px] text-zinc-400">Pick courses &amp; assign to semester</div>
+              <div className="text-xs font-medium">Add Courses</div>
+              <div className="text-[10px] text-[#888888]">Pick courses &amp; assign</div>
             </div>
           </button>
 
@@ -209,21 +209,21 @@ export default function SpeedDialMenu({
               handleClose();
               onQuickGrades();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-500/15 text-left text-zinc-200 hover:text-white transition-all group cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-[#fafafa] dark:hover:bg-[#141414] text-left text-[#171717] dark:text-[#ededed] transition-all group cursor-pointer"
           >
-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Award className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+              <Award className="w-3.5 h-3.5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold">Quick Grades</span>
+                <span className="text-xs font-medium">Quick Grades</span>
                 {isCgpaMode && (
-                  <span className="text-[9px] px-1 rounded bg-indigo-500/25 text-indigo-300">
+                  <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-[#0070f3]">
                     CGPA
                   </span>
                 )}
               </div>
-              <div className="text-[10px] text-zinc-400">Slide carousel &amp; tap grades</div>
+              <div className="text-[10px] text-[#888888]">Slide carousel &amp; tap grades</div>
             </div>
           </button>
         </div>
@@ -232,15 +232,15 @@ export default function SpeedDialMenu({
       {/* Main Trigger Button */}
       <button
         onClick={handleToggle}
-        className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-[0_0_25px_rgba(99,102,241,0.4)] transition-all duration-300 cursor-pointer ${
+        className={`w-11 h-11 rounded-full flex items-center justify-center shadow-vercel-float border border-[#ebebeb] dark:border-[#262626] transition-all duration-200 cursor-pointer ${
           isOpen
-            ? "bg-zinc-800 text-white rotate-45 border border-zinc-600 scale-95"
-            : "bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-500 text-white hover:scale-105 active:scale-95 border border-indigo-400/30"
+            ? "bg-[#fafafa] dark:bg-[#1a1a1a] text-[#171717] dark:text-white rotate-45 scale-95"
+            : "bg-[#171717] dark:bg-white text-white dark:text-black hover:opacity-90 active:scale-95"
         }`}
         title="Add Semester, Courses, or Grades"
         aria-label="Add Semester, Courses, or Grades"
       >
-        <Plus className="w-7 h-7 stroke-[2.5]" />
+        <Plus className="w-5 h-5 stroke-[2.5]" />
       </button>
     </div>
   );

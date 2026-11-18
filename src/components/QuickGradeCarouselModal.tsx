@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, ChevronLeft, ChevronRight, Award, Check, Sparkles, BookOpen } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Award, Check, BookOpen } from "lucide-react";
 import { COURSES } from "@/app/courses-data";
 
 interface SelectedCourse {
@@ -82,64 +82,66 @@ export default function QuickGradeCarouselModal({
   const hasGrades = totalGradedCredits > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-3xl max-h-[92vh] flex flex-col bg-[#070712] border border-white/[0.1] rounded-3xl shadow-[0_0_60px_rgba(59,130,246,0.18)] overflow-hidden text-slate-100"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-white/[0.08] bg-[#070712] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-              <Award className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shadow-vercel-subtle">
+              <Award className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-wide">
+              <h3 className="text-sm font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
                 Quick Grade Entry
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#888888]">
                 Slide across semesters and tap grades for instant SGPA updates
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-lg text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Semester Tabs Carousel Navigation */}
-        <div className="bg-[#040409] border-b border-white/[0.06] px-3 py-2.5 flex items-center justify-between gap-2">
+        <div className="bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#262626] px-3 py-2 flex items-center justify-between gap-2">
           <button
             onClick={() => setActiveIdx(prev => Math.max(0, prev - 1))}
             disabled={currentIdx === 0}
-            className="p-1.5 rounded-lg text-indigo-400 hover:text-white hover:bg-indigo-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className="p-1 rounded-md text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0 cursor-pointer"
             title="Previous Semester"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
           {/* Scrollable Semester Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5 px-1">
             {semesters.map((sem, idx) => {
               const isActive = idx === currentIdx;
               return (
                 <button
                   key={sem.id}
                   onClick={() => setActiveIdx(idx)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                     isActive
-                      ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.35)] scale-105"
-                      : "bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.08] hover:border-indigo-500/40"
+                      ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-black shadow-vercel-subtle"
+                      : "bg-white dark:bg-[#1a1a1a] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] border border-[#ebebeb] dark:border-[#262626]"
                   }`}
                 >
                   <span>{sem.name}</span>
                   {sem.courses.length > 0 && (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
-                        isActive ? "bg-black/30 text-white font-extrabold" : "bg-indigo-500/15 text-indigo-300"
+                        isActive 
+                          ? "bg-white/20 dark:bg-black/20 text-current" 
+                          : "bg-[#f0f0f0] dark:bg-[#262626] text-[#888888]"
                       }`}
                     >
                       {sem.courses.length}
@@ -153,51 +155,51 @@ export default function QuickGradeCarouselModal({
           <button
             onClick={() => setActiveIdx(prev => Math.min(semesters.length - 1, prev + 1))}
             disabled={currentIdx === semesters.length - 1}
-            className="p-1.5 rounded-lg text-indigo-400 hover:text-white hover:bg-indigo-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className="p-1 rounded-md text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0 cursor-pointer"
             title="Next Semester"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         {/* Current Semester Summary Card */}
-        <div className="px-4 py-3 bg-[#080814] border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="font-extrabold text-white text-base">{currentSem.name}</span>
+        <div className="px-4 py-2.5 bg-white dark:bg-[#0c0c0c] border-b border-[#ebebeb] dark:border-[#262626] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm text-[#171717] dark:text-[#ededed]">{currentSem.name}</span>
             {currentSem.term && (
-              <span className="text-xs px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-300 border border-white/[0.08]">
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#f5f5f5] dark:bg-[#161616] text-[#888888] border border-[#ebebeb] dark:border-[#262626] font-mono">
                 {currentSem.term} {currentSem.year || ''}
               </span>
             )}
             {currentSem.isRS && (
-              <span className="text-xs px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-                Residential Semester
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-[#0070f3] border border-blue-500/20 font-mono font-medium uppercase">
+                RS
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#04040a] border border-white/[0.08]">
-              <span className="text-[11px] text-slate-400 font-medium">Credits:</span>
-              <span className="text-xs font-bold text-slate-200">{totalSemesterCredits}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626]">
+              <span className="text-[#888888]">Credits:</span>
+              <strong className="text-[#171717] dark:text-[#ededed] font-mono">{totalSemesterCredits}</strong>
             </div>
 
-            <div className="flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-indigo-500/15 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-              <span className="text-[11px] text-indigo-300 font-medium">SGPA:</span>
-              <span className={`text-sm font-extrabold ${hasGrades ? "text-indigo-200" : "text-zinc-500"}`}>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626]">
+              <span className="text-[#888888]">SGPA:</span>
+              <strong className={`font-mono ${hasGrades ? "text-[#0070f3]" : "text-[#888888]"}`}>
                 {sgpa}
-              </span>
+              </strong>
             </div>
           </div>
         </div>
 
         {/* Courses List & Interactive Grade Chips */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2.5 custom-scrollbar">
           {currentSem.courses.length === 0 ? (
-            <div className="py-12 text-center rounded-2xl border border-dashed border-white/[0.1] bg-white/[0.02]">
-              <BookOpen className="w-8 h-8 mx-auto text-slate-500 mb-2" />
-              <p className="text-sm font-medium text-slate-300">No courses in {currentSem.name}</p>
-              <p className="text-xs text-slate-500 mt-1">Use &ldquo;Add Courses&rdquo; to populate this semester first</p>
+            <div className="py-12 text-center rounded-xl border border-dashed border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111]">
+              <BookOpen className="w-8 h-8 mx-auto text-[#888888] mb-2" />
+              <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">No courses in {currentSem.name}</p>
+              <p className="text-[11px] text-[#888888] mt-1">Use Add Courses to populate this semester first</p>
             </div>
           ) : (
             currentSem.courses.map(c => {
@@ -208,34 +210,34 @@ export default function QuickGradeCarouselModal({
               return (
                 <div
                   key={c.code}
-                  className="p-3.5 rounded-2xl bg-[#090914] border border-white/[0.08] hover:border-indigo-500/35 transition-all space-y-2.5 shadow-sm"
+                  className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] space-y-2 shadow-vercel-subtle"
                 >
                   {/* Course Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-indigo-300 tracking-wide font-mono">
+                      <span className="font-semibold text-xs text-[#171717] dark:text-[#ededed] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626]">
                         {c.code}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-300 font-semibold border border-white/[0.08]">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] text-[#888888] border border-[#ebebeb] dark:border-[#262626] font-mono">
                         {cr} cr
                       </span>
                       {c.isRepeat && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
                           Retake
                         </span>
                       )}
-                      <span className="text-xs text-zinc-300 truncate max-w-[240px] hidden sm:inline">
+                      <span className="text-xs text-[#888888] truncate max-w-[200px] hidden sm:inline">
                         {courseInfo?.title}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-400">Grade:</span>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-[#888888] text-[11px]">Grade:</span>
                       <span
-                        className={`text-xs px-2.5 py-0.5 rounded-lg font-bold ${
+                        className={`text-[11px] px-2 py-0.5 rounded font-mono font-medium ${
                           currentGrade
-                            ? "bg-indigo-500/25 text-indigo-300 border border-indigo-400/40"
-                            : "bg-zinc-800 text-zinc-500"
+                            ? "bg-blue-500/10 text-[#0070f3] border border-blue-500/20"
+                            : "bg-[#f5f5f5] dark:bg-[#1a1a1a] text-[#888888] border border-[#ebebeb] dark:border-[#262626]"
                         }`}
                       >
                         {currentGrade || "Not Set"}
@@ -244,14 +246,14 @@ export default function QuickGradeCarouselModal({
                   </div>
 
                   {/* Horizontal Grade Selector Chips */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                  <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar py-0.5">
                     {/* Clear / Unset Chip */}
                     <button
                       onClick={() => onUpdateGrade(currentSem.id, c.code, "")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                      className={`h-7 px-2.5 rounded text-xs font-mono transition-all flex-shrink-0 cursor-pointer ${
                         currentGrade === ""
-                          ? "bg-zinc-700 text-white border border-zinc-500"
-                          : "bg-[#04040a] text-zinc-400 hover:text-zinc-200 border border-white/[0.08]"
+                          ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-black font-semibold shadow-vercel-subtle"
+                          : "bg-white dark:bg-[#1a1a1a] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] border border-[#ebebeb] dark:border-[#262626]"
                       }`}
                       title="Clear grade"
                     >
@@ -260,18 +262,18 @@ export default function QuickGradeCarouselModal({
 
                     {GRADE_OPTIONS.map(g => {
                       const isSelected = currentGrade === g;
-                      const isPassing = g !== "F";
+                      const isF = g === "F";
 
                       return (
                         <button
                           key={g}
                           onClick={() => onUpdateGrade(currentSem.id, c.code, g)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                          className={`h-7 px-2.5 rounded text-xs font-mono transition-all flex-shrink-0 cursor-pointer ${
                             isSelected
-                              ? isPassing
-                                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)] scale-105 border border-indigo-400/40 font-black"
-                                : "bg-rose-600 text-white shadow-[0_0_10px_rgba(244,63,94,0.4)] scale-105 border border-rose-400/40 font-black"
-                              : "bg-[#04040a] text-slate-300 hover:bg-indigo-500/15 hover:text-white border border-white/[0.08] hover:border-indigo-500/30"
+                              ? isF
+                                ? "bg-rose-500 text-white font-semibold shadow-vercel-subtle"
+                                : "bg-[#0070f3] text-white font-semibold shadow-vercel-subtle"
+                              : "bg-white dark:bg-[#1a1a1a] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] border border-[#ebebeb] dark:border-[#262626]"
                           }`}
                         >
                           {g}
@@ -286,27 +288,27 @@ export default function QuickGradeCarouselModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3.5 sm:p-4 border-t border-white/[0.08] bg-[#040409] flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveIdx(prev => Math.max(0, prev - 1))}
               disabled={currentIdx === 0}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-white/[0.1] hover:border-indigo-500/40 hover:bg-indigo-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              ← Prev Sem
+              ← Prev
             </button>
             <button
               onClick={() => setActiveIdx(prev => Math.min(semesters.length - 1, prev + 1))}
               disabled={currentIdx === semesters.length - 1}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-white/[0.1] hover:border-indigo-500/40 hover:bg-indigo-500/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              Next Sem →
+              Next →
             </button>
           </div>
 
           <button
             onClick={onClose}
-            className="px-6 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(99,102,241,0.35)] active:scale-95 transition-all cursor-pointer"
+            className="px-5 py-1.5 rounded-lg bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black font-medium text-xs shadow-vercel-subtle active:scale-95 transition-all cursor-pointer"
           >
             Done
           </button>

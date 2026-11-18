@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Search, Check, Layers, AlertTriangle, ArrowRight, BookOpen, Plus, Repeat, Trash2, ChevronDown, ChevronUp } from "lucide-react";
-import { COURSES, Course } from "@/app/courses-data";
+import { X, Search, Check, Layers, AlertTriangle, BookOpen, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { COURSES } from "@/app/courses-data";
 
 interface SelectedCourse {
   code: string;
@@ -209,50 +209,50 @@ export default function AddCoursesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-3xl max-h-[92vh] flex flex-col bg-[#070712] border border-white/[0.1] rounded-3xl shadow-[0_0_60px_rgba(59,130,246,0.18)] overflow-hidden text-slate-100"
+        className="w-full max-w-3xl max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl shadow-vercel-modal overflow-hidden text-[#171717] dark:text-[#ededed]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-white/[0.08] bg-[#070712] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#0c0c0c] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-              <BookOpen className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shadow-vercel-subtle">
+              <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] tracking-tight flex items-center gap-2">
                 Add &amp; Assign Courses
                 {selectedCodes.length > 0 && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-mono font-medium bg-blue-500/10 text-[#0070f3] border border-blue-500/20">
                     {selectedCodes.length} selected
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Select one or multiple courses and assign them to your target semester
+              <p className="text-xs text-[#888888] mt-0.5">
+                Select courses and assign them to your target semester
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+            className="p-1.5 rounded-lg text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
           
           {/* Top Panel: Interactive Semester Review Drawer & Overload Safeguard */}
-          <div className="bg-[#050714] border border-blue-500/25 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-md relative overflow-hidden">
+          <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-3.5 sm:p-4 space-y-3 shadow-vercel-subtle relative overflow-hidden">
             {/* Header row: Semester Selector + Credit Load Badges + Action Buttons */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-blue-400 shrink-0" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  <Layers className="w-4 h-4 text-[#0070f3] shrink-0" />
+                  <span className="text-xs font-medium uppercase tracking-wider text-[#888888]">
                     Reviewing Semester:
                   </span>
                 </div>
@@ -262,10 +262,10 @@ export default function AddCoursesModal({
                     setActiveSemId(e.target.value);
                     setShowClearConfirm(false);
                   }}
-                  className="bg-[#0a0d24] border border-blue-500/30 text-white font-bold text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-400 cursor-pointer shadow-sm"
+                  className="bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] font-medium text-xs rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer shadow-vercel-subtle"
                 >
                   {semesters.map(s => (
-                    <option key={s.id} value={s.id} className="bg-[#070918] text-white">
+                    <option key={s.id} value={s.id} className="bg-white dark:bg-[#161616] text-[#171717] dark:text-[#ededed]">
                       {s.name} {s.term ? `(${s.term} ${s.year || ''})` : ''} — {s.courses.length} enrolled
                     </option>
                   ))}
@@ -274,25 +274,25 @@ export default function AddCoursesModal({
 
               {/* Capacity Meter & Credit Load Badges */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 border shadow-inner ${
+                <div className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium flex items-center gap-1.5 border ${
                   isOverloaded
-                    ? "bg-rose-950/40 text-rose-300 border-rose-500/40 shadow-rose-950/50"
+                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                     : projectedCredits > 15
-                    ? "bg-amber-950/40 text-amber-300 border-amber-500/40"
-                    : "bg-blue-950/40 text-blue-300 border-blue-500/40"
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                    : "bg-[#f5f5f5] dark:bg-[#161616] text-[#171717] dark:text-[#ededed] border-[#ebebeb] dark:border-[#262626]"
                 }`}>
                   <span>{enrolledCredits}cr</span>
                   {pendingCreditsForActive > 0 && (
-                    <span className="text-indigo-400 font-extrabold">+{pendingCreditsForActive}cr new</span>
+                    <span className="text-[#0070f3] font-semibold">+{pendingCreditsForActive}cr new</span>
                   )}
-                  <span className="text-slate-400 font-normal">/ 18cr max</span>
+                  <span className="text-[#888888] font-normal">/ 18cr max</span>
                 </div>
 
                 {/* Drawer Toggle */}
                 <button
                   type="button"
                   onClick={() => setIsDrawerExpanded(prev => !prev)}
-                  className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 border border-white/[0.08] transition flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#202020] text-[#171717] dark:text-[#ededed] border border-[#ebebeb] dark:border-[#262626] transition flex items-center gap-1 cursor-pointer shadow-vercel-subtle"
                 >
                   <span>Enrolled ({enrolledCourses.length})</span>
                   {isDrawerExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -303,7 +303,7 @@ export default function AddCoursesModal({
                   <button
                     type="button"
                     onClick={() => setShowClearConfirm(true)}
-                    className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-[#ee0000] border border-rose-500/20 transition flex items-center gap-1 cursor-pointer shadow-vercel-subtle"
                     title="Clear all courses from this semester"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -315,8 +315,8 @@ export default function AddCoursesModal({
 
             {/* Overload Alert Warning if > 18 credits */}
             {isOverloaded && (
-              <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200 flex items-center gap-2 animate-in fade-in duration-200">
-                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 flex items-center gap-2 animate-in fade-in duration-200">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
                   <strong>Overload Warning:</strong> Adding these courses pushes <strong>{currentReviewSemester?.name}</strong> to <strong>{projectedCredits} credits</strong> ({enrolledCourses.length + pendingAssignedToActive.length} courses), exceeding the standard 18-credit limit.
                 </span>
@@ -325,9 +325,9 @@ export default function AddCoursesModal({
 
             {/* Clear Confirmation Prompt */}
             {showClearConfirm && (
-              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 text-xs text-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-in fade-in duration-200">
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-in fade-in duration-200">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>
                     Remove all <strong>{enrolledCourses.length} courses</strong> from <strong>{currentReviewSemester?.name}</strong>?
                   </span>
@@ -341,14 +341,14 @@ export default function AddCoursesModal({
                       }
                       setShowClearConfirm(false);
                     }}
-                    className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-sm cursor-pointer transition"
+                    className="px-3 py-1 rounded-md bg-[#ee0000] hover:bg-rose-700 text-white font-medium text-xs shadow-vercel-subtle cursor-pointer transition"
                   >
                     Yes, Clear All
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowClearConfirm(false)}
-                    className="px-3 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 font-semibold text-xs cursor-pointer transition"
+                    className="px-3 py-1 rounded-md bg-white dark:bg-[#1a1a1a] hover:bg-[#f5f5f5] dark:hover:bg-[#222] text-[#888888] border border-[#ebebeb] dark:border-[#262626] font-medium text-xs cursor-pointer transition"
                   >
                     Cancel
                   </button>
@@ -358,14 +358,14 @@ export default function AddCoursesModal({
 
             {/* Expandable Enrolled Courses Drawer */}
             {isDrawerExpanded && (
-              <div className="pt-2.5 border-t border-white/[0.08] space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <div className="pt-2.5 border-t border-[#ebebeb] dark:border-[#262626] space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-[11px] font-medium text-[#888888] uppercase tracking-wider">
                   <span>Enrolled Courses in {currentReviewSemester?.name}</span>
-                  <span>{enrolledCourses.length} total</span>
+                  <span className="font-mono">{enrolledCourses.length} total</span>
                 </div>
 
                 {enrolledCourses.length === 0 ? (
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-dashed border-white/[0.08] text-center text-xs text-slate-400">
+                  <div className="p-3 rounded-lg bg-white dark:bg-[#161616] border border-dashed border-[#ebebeb] dark:border-[#262626] text-center text-xs text-[#888888]">
                     This semester is currently empty. Use the catalog below to add courses!
                   </div>
                 ) : (
@@ -375,21 +375,21 @@ export default function AddCoursesModal({
                       return (
                         <div
                           key={`${c.code}-${cIdx}`}
-                          className="p-2.5 rounded-xl bg-[#090b1c] border border-white/[0.08] flex items-center justify-between gap-2 shadow-sm"
+                          className="p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-2 shadow-vercel-subtle"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-mono font-bold text-xs text-blue-300">{c.code}</span>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/[0.06] text-slate-300 font-semibold">
+                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed]">{c.code}</span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f5f5f5] dark:bg-[#202020] text-[#888888] font-mono">
                                 {courseInfo?.credits || 3}cr
                               </span>
                               {c.grade && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium bg-blue-500/10 text-[#0070f3] border border-blue-500/20">
                                   {c.grade}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                            <p className="text-[11px] text-[#888888] truncate mt-0.5">
                               {courseInfo?.title || c.code}
                             </p>
                           </div>
@@ -402,7 +402,7 @@ export default function AddCoursesModal({
                                   onRemoveCourseFromSemester(currentReviewSemester.id, c.code);
                                 }
                               }}
-                              className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition cursor-pointer"
+                              className="p-1.5 text-[#888888] hover:text-[#ee0000] rounded-md hover:bg-rose-500/10 transition cursor-pointer"
                               title={`Remove ${c.code} from ${currentReviewSemester?.name}`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -419,15 +419,15 @@ export default function AddCoursesModal({
 
           {/* Section 1: Selected Courses & Target Semesters Dropdown */}
           {selectedCodes.length > 0 && (
-            <div className="p-4 rounded-2xl bg-[#040409] border border-white/[0.08] space-y-3 shadow-inner">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-indigo-300 flex-wrap gap-2">
+            <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] space-y-3 shadow-vercel-subtle">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#171717] dark:text-[#ededed] flex-wrap gap-2">
                 <span>Selected Courses &amp; Target Semesters ({selectedCodes.length})</span>
                 <div className="flex items-center gap-2">
                   {currentReviewSemester && (
                     <button
                       type="button"
                       onClick={handleAssignAllToActive}
-                      className="text-[11px] font-bold text-blue-300 hover:text-white px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 transition cursor-pointer"
+                      className="text-[11px] font-medium text-[#0070f3] hover:underline px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 transition cursor-pointer"
                       title={`Assign all selected to ${currentReviewSemester.name}`}
                     >
                       Assign all to {currentReviewSemester.name}
@@ -439,14 +439,14 @@ export default function AddCoursesModal({
                       setTargetSemesters({});
                       setDuplicateResolutions({});
                     }}
-                    className="text-zinc-400 hover:text-rose-400 text-[11px] underline cursor-pointer"
+                    className="text-[#888888] hover:text-[#ee0000] text-[11px] underline cursor-pointer"
                   >
                     Clear all
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {selectedCodes.map(code => {
                   const courseInfo = COURSES.find(c => c.code === code);
                   const chosenSemId = targetSemesters[code] || semesters[0]?.id;
@@ -457,39 +457,39 @@ export default function AddCoursesModal({
                   return (
                     <div
                       key={code}
-                      className="p-3.5 rounded-2xl bg-[#090914] border border-white/[0.08] space-y-2.5 shadow-sm"
+                      className="p-3 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] space-y-2 shadow-vercel-subtle"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-indigo-300 font-mono">{code}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-300 font-medium border border-white/[0.08]">
+                          <span className="font-semibold text-xs text-[#171717] dark:text-[#ededed] font-mono">{code}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#202020] text-[#888888] font-mono">
                             {courseInfo?.credits || 3}cr
                           </span>
-                          <span className="text-xs text-zinc-300 truncate max-w-[200px]">
+                          <span className="text-xs text-[#888888] truncate max-w-[200px]">
                             {courseInfo?.title}
                           </span>
                         </div>
 
                         {/* Semester Select Dropdown */}
                         <div className="flex items-center gap-2">
-                          <label className="text-xs text-zinc-400 whitespace-nowrap">Semester:</label>
+                          <label className="text-xs text-[#888888] whitespace-nowrap">Semester:</label>
                           <select
                             value={chosenSemId}
                             onChange={e => {
                               const newSemId = e.target.value;
                               setTargetSemesters(prev => ({ ...prev, [code]: newSemId }));
                             }}
-                            className="bg-[#04040a] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-400"
+                            className="bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] rounded-md px-2 py-1 text-xs text-[#171717] dark:text-[#ededed] font-medium focus:outline-none"
                           >
                             {semesters.map(sem => (
-                              <option key={sem.id} value={sem.id} className="bg-[#070712] text-zinc-100">
+                              <option key={sem.id} value={sem.id} className="bg-white dark:bg-[#141414] text-[#171717] dark:text-[#ededed]">
                                 {sem.name} {sem.term ? `(${sem.term} ${sem.year || ''})` : ''}
                               </option>
                             ))}
                           </select>
                           <button
                             onClick={() => toggleSelectCourse(code)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                            className="p-1 text-[#888888] hover:text-[#ee0000] rounded-md transition-colors cursor-pointer"
                             title="Remove from selection"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -499,9 +499,9 @@ export default function AddCoursesModal({
 
                       {/* Duplicate prompt if already in another semester */}
                       {isAlreadyInSem && (
-                        <div className="mt-2 p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/30 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="mt-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
-                            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
                             <span>
                               <strong>{code}</strong> is currently in <strong>{existingSem.name}</strong>.
                             </span>
@@ -512,10 +512,10 @@ export default function AddCoursesModal({
                               onClick={() =>
                                 setDuplicateResolutions(prev => ({ ...prev, [code]: 'move' }))
                               }
-                              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                                 resolution === 'move'
-                                  ? 'bg-amber-500/25 border border-amber-400 text-amber-200 font-bold shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                                  : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/[0.08]'
+                                  ? 'bg-[#171717] dark:bg-[#ededed] text-white dark:text-black font-semibold'
+                                  : 'bg-white dark:bg-[#141414] text-[#888888] border border-[#ebebeb] dark:border-[#262626]'
                               }`}
                             >
                               Move Course
@@ -525,10 +525,10 @@ export default function AddCoursesModal({
                               onClick={() =>
                                 setDuplicateResolutions(prev => ({ ...prev, [code]: 'repeat' }))
                               }
-                              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                                 resolution === 'repeat'
-                                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white font-bold shadow-[0_0_12px_rgba(99,102,241,0.35)] border border-indigo-400/40'
-                                  : 'bg-white/[0.04] text-slate-400 hover:text-white border border-white/[0.08]'
+                                  ? 'bg-[#0070f3] text-white font-semibold'
+                                  : 'bg-white dark:bg-[#141414] text-[#888888] border border-[#ebebeb] dark:border-[#262626]'
                               }`}
                             >
                               Keep Both (Retake)
@@ -545,23 +545,23 @@ export default function AddCoursesModal({
 
           {/* Section 2: Search & Filter Course Catalog */}
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300 mb-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#171717] dark:text-[#ededed] mb-2">
               Browse Course Catalog
             </div>
 
             <div className="relative mb-2.5">
-              <Search className="w-4 h-4 text-indigo-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-[#888888] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by code or title (e.g. CSE320, Statistics, PHY112)..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-[#040409] border border-white/[0.1] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all"
+                className="w-full pl-9 pr-8 py-2 bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] rounded-lg text-xs text-[#171717] dark:text-[#ededed] placeholder-[#888888] focus:outline-none focus:border-[#0070f3] transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -569,15 +569,15 @@ export default function AddCoursesModal({
             </div>
 
             {/* Filter tags */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs mb-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-xs mb-3">
               {["ALL", "CSE", "MAT", "ENG", "RS", "GED"].map(tag => (
                 <button
                   key={tag}
                   onClick={() => setCategoryFilter(tag)}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                  className={`px-2.5 py-1 rounded-md font-medium text-xs transition-all cursor-pointer ${
                     categoryFilter === tag
-                      ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30 font-bold"
-                      : "bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.08] hover:border-indigo-500/30"
+                      ? "bg-[#171717] dark:bg-[#ededed] text-white dark:text-black font-semibold shadow-vercel-subtle"
+                      : "bg-[#fafafa] dark:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] border border-[#ebebeb] dark:border-[#262626]"
                   }`}
                 >
                   {tag}
@@ -595,35 +595,35 @@ export default function AddCoursesModal({
                   <div
                     key={course.code}
                     onClick={() => toggleSelectCourse(course.code)}
-                    className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                    className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-center justify-between ${
                       isSelected
-                        ? "bg-indigo-500/15 border-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.25)]"
-                        : "bg-[#090914] border-white/[0.08] hover:border-indigo-500/35 hover:bg-[#0d0d1e]"
+                        ? "bg-blue-500/10 border-blue-500/30 text-[#171717] dark:text-[#ededed] shadow-vercel-subtle"
+                        : "bg-[#fafafa] dark:bg-[#111111] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555]"
                     }`}
                   >
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-indigo-300 font-mono">{course.code}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.05] text-slate-300 font-medium">
+                        <span className="font-semibold text-xs text-[#171717] dark:text-[#ededed] font-mono">{course.code}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] text-[#888888] border border-[#ebebeb] dark:border-[#262626] font-mono">
                           {course.credits}cr
                         </span>
                         {existingSem && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
                             {existingSem.name}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-300 truncate mt-0.5">{course.title}</p>
+                      <p className="text-xs text-[#888888] truncate mt-0.5">{course.title}</p>
                     </div>
 
                     <div
-                      className={`w-6 h-6 rounded-lg border flex items-center justify-center flex-shrink-0 transition-colors ${
+                      className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
                         isSelected
-                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 border-indigo-400 text-white shadow-sm"
-                          : "border-white/[0.15] text-transparent"
+                          ? "bg-[#0070f3] border-[#0070f3] text-white shadow-vercel-subtle"
+                          : "border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]"
                       }`}
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
                   </div>
                 );
@@ -633,27 +633,27 @@ export default function AddCoursesModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3.5 sm:p-4 border-t border-white/[0.08] bg-[#040409] flex items-center justify-between">
-          <div className="text-xs text-slate-400">
+        <div className="p-3.5 sm:p-4 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex items-center justify-between">
+          <div className="text-xs text-[#888888]">
             {selectedCodes.length === 0 ? (
               <span>Select courses above to assign</span>
             ) : (
               <span>
-                Ready to assign <strong className="text-white">{selectedCodes.length}</strong> courses
+                Ready to assign <strong className="text-[#171717] dark:text-[#ededed] font-mono">{selectedCodes.length}</strong> course{selectedCodes.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               disabled={selectedCodes.length === 0}
               onClick={handleCommit}
-              className="px-6 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(99,102,241,0.35)] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+              className="px-5 py-1.5 rounded-lg bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black font-medium text-xs shadow-vercel-subtle active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
               Add to Semesters
             </button>

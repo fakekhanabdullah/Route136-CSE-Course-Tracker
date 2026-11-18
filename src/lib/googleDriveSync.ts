@@ -219,7 +219,7 @@ export async function fetchGoogleUserProfile(accessToken: string): Promise<Cloud
     // Revoke token immediately so no unauthorized access remains
     revokeGoogleToken(accessToken).catch(() => {});
     const err = new Error(
-      `Access Denied: Account "${email}" is not authorized. Flow136 Cloud Sync is exclusively available for official BRAC University student accounts (${BRACU_STUDENT_DOMAIN}).`
+      `Access Denied: Account "${email}" is not authorized. Route136 Cloud Sync is exclusively available for official BRAC University student accounts (${BRACU_STUDENT_DOMAIN}).`
     );
     (err as any).isGatekeeperError = true;
     (err as any).attemptedEmail = email;
@@ -251,7 +251,7 @@ export async function revokeGoogleToken(accessToken: string): Promise<void> {
 }
 
 /**
- * Finds existing Flow136 backup file inside user's private Google Drive appDataFolder
+ * Finds existing Route136 backup file inside user's private Google Drive appDataFolder
  */
 export async function findDriveBackupFile(accessToken: string): Promise<DriveFileMetadata | null> {
   const query = encodeURIComponent(`name = '${DRIVE_BACKUP_FILENAME}' and trashed = false`);
@@ -275,7 +275,7 @@ export async function findDriveBackupFile(accessToken: string): Promise<DriveFil
 }
 
 /**
- * Uploads (creates or updates) Flow136 backup file in user's Google Drive appDataFolder
+ * Uploads (creates or updates) Route136 backup file in user's Google Drive appDataFolder
  */
 export async function saveDriveBackup(
   accessToken: string,
@@ -352,7 +352,7 @@ export async function saveDriveBackup(
 }
 
 /**
- * Downloads Flow136 backup file content from Google Drive appDataFolder
+ * Downloads Route136 backup file content from Google Drive appDataFolder
  */
 export async function loadDriveBackup(accessToken: string, fileId: string): Promise<DriveBackupPayload> {
   const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
@@ -379,7 +379,7 @@ export function simulateStudentLogin(email: string, name = 'BRACU CSE Student'):
   const isBRACU = isAuthorizedBRACUStudent(email);
   if (!isBRACU) {
     const err = new Error(
-      `Access Denied: Account "${email}" is not authorized. Flow136 Cloud Sync is exclusively available for official BRAC University student accounts (${BRACU_STUDENT_DOMAIN}).`
+      `Access Denied: Account "${email}" is not authorized. Route136 Cloud Sync is exclusively available for official BRAC University student accounts (${BRACU_STUDENT_DOMAIN}).`
     );
     (err as any).isGatekeeperError = true;
     (err as any).attemptedEmail = email;

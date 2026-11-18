@@ -1,8 +1,10 @@
-# Flow136 — BRACU CSE Course Tracker & Degree Companion
+# Route136 — BRACU CSE Course Tracker & Degree Companion
 
 <div align="center">
 
-![Flow136 Banner](src/app/icon.svg)
+
+![Route136 Banner](public/icon.svg)
+>>>>>>> 75e55a9 (Ui changes And New Name)
 
 **Your BRACU CSE Curriculum, Minus the Complexity.**  
 *Interactive Progress Tracker • Prerequisite DAG Validator • CGPA ROI Analyzer • Zero-Database Google Drive Cloud Sync*
@@ -40,9 +42,9 @@
 
 ## 🚀 Overview
 
-**Flow136** is an open-source, client-first academic degree companion crafted specifically for Computer Science & Engineering (CSE) undergraduate students at **BRAC University (BRACU)**. 
+**Route136** is an open-source, client-first academic degree companion crafted specifically for Computer Science & Engineering (CSE) undergraduate students at **BRAC University (BRACU)**. 
 
-Navigating a 136-credit undergraduate engineering curriculum with intricate prerequisite dependency chains, strict General Education (GenEd) requirements, and retake grade replacement rules can be daunting. Flow136 gives students a visual, interactive dashboard to plan their semesters, validate course prerequisites in real time, forecast CGPAs, and seamlessly back up their academic records directly to their personal Google Drive.
+Navigating a 136-credit undergraduate engineering curriculum with intricate prerequisite dependency chains, strict General Education (GenEd) requirements, and retake grade replacement rules can be daunting. Route136 gives students a visual, interactive dashboard to plan their semesters, validate course prerequisites in real time, forecast CGPAs, and seamlessly back up their academic records directly to their personal Google Drive.
 
 ---
 
@@ -66,7 +68,7 @@ Navigating a 136-credit undergraduate engineering curriculum with intricate prer
 - Tracks remaining elective credits and alerts students when distribution thresholds are met.
 
 ### 4. Target GPA Forward Solver
-- Input a target graduation CGPA (e.g., `3.50` or `3.80`) and have Flow136 calculate the exact average GPA required across your remaining semester credits to reach your goal.
+- Input a target graduation CGPA (e.g., `3.50` or `3.80`) and have Route136 calculate the exact average GPA required across your remaining semester credits to reach your goal.
 
 ### 5. Snapshot Progress Exporter
 - Export your entire academic progress graph and completed course status as a clean, high-resolution PNG image directly from the browser for offline reference or academic advising sessions.
@@ -75,7 +77,7 @@ Navigating a 136-credit undergraduate engineering curriculum with intricate prer
 
 ## 🔒 Authentication & Zero-Database Architecture
 
-Flow136 adopts a **Zero-Database Privacy Architecture**. No personal academic data, student IDs, or course plans are stored on third-party servers or databases.
+Route136 adopts a **Zero-Database Privacy Architecture**. No personal academic data, student IDs, or course plans are stored on third-party servers or databases.
 
 ```mermaid
 flowchart TD
@@ -105,7 +107,7 @@ flowchart TD
 
 ### Private Google Drive `appDataFolder` Sync
 - Authenticated students store their entire academic plan inside their personal Google Drive's hidden `appDataFolder` (`https://www.googleapis.com/auth/drive.appdata`).
-- **Zero Server Footprint**: Flow136 communicates directly from the client browser to Google's official Drive v3 REST API.
+- **Zero Server Footprint**: Route136 communicates directly from the client browser to Google's official Drive v3 REST API.
 - **Auto-Sync & Manual Backup**: Progress auto-syncs seamlessly, with manual **"Backup to Cloud"** and **"Restore from Cloud"** options available anytime.
 
 ### Guest Session (Local Storage Only)
@@ -125,8 +127,8 @@ flowchart TD
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/fakekhanabdullah/Flow136-CSE-Course-Tracker.git
-   cd Flow136-CSE-Course-Tracker
+   git clone https://github.com/fakekhanabdullah/Route136-CSE-Course-Tracker.git
+   cd Route136-CSE-Course-Tracker
    ```
 
 2. **Install dependencies**:
@@ -152,7 +154,7 @@ flowchart TD
 
 ## 🤖 AI-Assisted Development (Antigravity)
 
-Flow136 was architected and refined using **Google Antigravity (AGY)** pair-programming standards. Development guardrails codified in `AGENTS.md` enforce strict Next.js App Router conventions, zero-database privacy boundaries, and TypeScript type integrity across all changes.
+Route136 was architected and refined using **Google Antigravity (AGY)** pair-programming standards. Development guardrails codified in `AGENTS.md` enforce strict Next.js App Router conventions, zero-database privacy boundaries, and TypeScript type integrity across all changes.
 
 Key custom skills and tools leveraged during development include:
 - **`agy-customizations` & `antigravity-guide`**: Managed workspace rules, context-efficient skill loading, and agent pair-programming standards.
@@ -166,7 +168,7 @@ This approach enabled rapid, testable feature delivery—such as prerequisite gr
 ## 📂 Project Structure
 
 ```
-Flow136-CSE-Course-Tracker/
+Route136-CSE-Course-Tracker/
 ├── .agents/                    # Workspace agent configurations & skills
 ├── AGENTS.md                   # Workspace rules & Next.js conventions
 ├── PRIVACY_POLICY.md           # Standalone Privacy Policy document
@@ -185,14 +187,14 @@ Flow136-CSE-Course-Tracker/
 ├── package.json                # Project dependencies and script declarations
 ├── next.config.ts              # Next.js configuration
 ├── tsconfig.json               # TypeScript strict configuration
-└── README.md                   # Flow136 Comprehensive Documentation
+└── README.md                   # Route136 Comprehensive Documentation
 ```
 
 ---
 
 ## 📜 Disclaimer & License
 
-- **Disclaimer**: Flow136 is an independent, open-source tool developed by [Khan Abdullah](https://github.com/fakekhanabdullah) and is **not officially affiliated with or endorsed by BRAC University**. All course codes, credits, and syllabus pathways are derived from public BRACU CSE departmental guidelines.
+- **Disclaimer**: Route136 is an independent, open-source tool developed by [Khan Abdullah](https://github.com/fakekhanabdullah) and is **not officially affiliated with or endorsed by BRAC University**. All course codes, credits, and syllabus pathways are derived from public BRACU CSE departmental guidelines.
 - **License**: Released under the [MIT License](LICENSE).
 
 ---

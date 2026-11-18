@@ -36,6 +36,9 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronsUpDown,
+  ChevronsDownUp,
+  Calculator,
   Sparkles,
   CheckCircle2,
   Crosshair,
@@ -54,7 +57,9 @@ import {
   Key,
   User,
   ExternalLink,
-  Menu
+  Menu,
+  Sun,
+  Moon
 } from "lucide-react";
 import { COURSES, PREREQUISITES, Course, PrereqRule } from "./courses-data";
 import {
@@ -226,6 +231,47 @@ const dedupeSemesterCourses = (courses: SelectedCourse[]): SelectedCourse[] => {
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+
+  // Vercel Dual-Mode Theme (Dark / Light)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('flow136_theme') as 'dark' | 'light' | null;
+      if (savedTheme) {
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const initialTheme = isDark ? 'dark' : 'light';
+        setTheme(initialTheme);
+        if (initialTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    } catch {}
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('flow136_theme', next);
+      } catch {}
+      if (next === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      return next;
+    });
+  };
 
   // App settings/modes
   const [mode, setMode] = useState<'tracker' | 'gpa'>('tracker');
@@ -434,6 +480,48 @@ export default function Home() {
     requestAnimationFrame(() => {
       isSyncingScroll.current = false;
     });
+  };
+
+  // Kanban mouse wheel & drag-to-scroll support
+  const isPointerDownRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragScrollLeftRef = useRef(0);
+
+  const handleBoardMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('select') || target.closest('input') || target.closest('[draggable="true"]')) {
+      return;
+    }
+    isPointerDownRef.current = true;
+    dragStartXRef.current = e.pageX;
+    dragScrollLeftRef.current = boardContainerRef.current?.scrollLeft || 0;
+  };
+
+  const handleBoardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPointerDownRef.current || !boardContainerRef.current) return;
+    e.preventDefault();
+    const walk = (e.pageX - dragStartXRef.current) * 1.4;
+    boardContainerRef.current.scrollLeft = dragScrollLeftRef.current - walk;
+  };
+
+  const handleBoardMouseUp = () => {
+    isPointerDownRef.current = false;
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      isPointerDownRef.current = false;
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, []);
+
+  const handleBoardWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (currentLayout === 'kanban' && boardContainerRef.current) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        boardContainerRef.current.scrollLeft += e.deltaY;
+      }
+    }
   };
 
   // Monitor screen width for responsive features
@@ -946,7 +1034,7 @@ export default function Home() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stateExport, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", "Flow136_Backup.json");
+    downloadAnchor.setAttribute("download", "Route136_Backup.json");
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -1005,7 +1093,7 @@ export default function Home() {
         }
         // Programmatic fast-download
         const url = URL.createObjectURL(blob);
-        const filename = `Flow136_Progress_${cumulativeStats.completedCredits}cr.png`;
+        const filename = `Route136_Progress_${cumulativeStats.completedCredits}cr.png`;
         const downloadLink = document.createElement("a");
         downloadLink.href = url;
         downloadLink.download = filename;
@@ -2890,32 +2978,30 @@ export default function Home() {
 
   const CSE400 = ({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: () => void }) => {
     return (
-      <div className="bg-[#070913]/90 border border-purple-500/30 rounded-3xl p-6 backdrop-blur-md shadow-2xl relative overflow-hidden h-full flex flex-col justify-between">
-        <div className="absolute top-0 right-0 h-40 w-40 bg-purple-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-        
-        <div className={`flex flex-wrap items-center justify-between gap-3 ${isCollapsed ? "" : "border-b border-white/[0.06] pb-5 mb-6"}`}>
-          <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)] shrink-0">
-              <FileText className="h-5 w-5" />
+      <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden h-full flex flex-col justify-between">
+        <div className={`flex flex-wrap items-center justify-between gap-3 ${isCollapsed ? "" : "border-b border-[#ebebeb] dark:border-[#262626] pb-4 mb-5"}`}>
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shadow-vercel-subtle shrink-0">
+              <FileText className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base text-white tracking-tight">
+              <h3 className="font-semibold text-sm text-[#171717] dark:text-[#ededed] tracking-tight">
                 CSE400 — Final Year Capstone
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Academic Research Thesis, Engineering Project, or Corporate Internship</p>
+              <p className="text-xs text-[#888888] mt-0.5">Academic Research Thesis, Engineering Project, or Corporate Internship</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] font-bold bg-[#0e0e14] border border-purple-500/30 text-purple-300 px-3 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-              {isCSE400Passed ? "Completed: 4 / 4 Cr" : "Incomplete: 0 / 4 Cr"}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono font-medium bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-[#888888] px-2.5 py-1 rounded-md">
+              {isCSE400Passed ? "4 / 4 Cr" : "0 / 4 Cr"}
             </span>
             {isCSE400Passed ? (
-              <span className="text-[11px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-full uppercase tracking-wider shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+              <span className="text-[11px] font-mono font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-md">
                 Passed / Defended
               </span>
             ) : (
-              <span className="text-[11px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-full uppercase tracking-wider shadow-[0_0_12px_rgba(245,158,11,0.15)]">
+              <span className="text-[11px] font-mono font-medium bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-md">
                 In Progress
               </span>
             )}
@@ -2929,7 +3015,7 @@ export default function Home() {
                 }
               }}
               aria-label="Toggle Capstone Module"
-              className="relative z-30 pointer-events-auto cursor-pointer flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/[0.08] text-slate-300 hover:text-white transition-all select-none flex-shrink-0"
+              className="cursor-pointer flex items-center justify-center w-8 h-8 rounded-lg bg-[#fafafa] dark:bg-[#141414] hover:bg-[#f0f0f0] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition-all flex-shrink-0"
               title={isCollapsed ? "Expand Capstone" : "Minimize Capstone"}
             >
               {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -2938,11 +3024,11 @@ export default function Home() {
         </div>
 
         {!isCollapsed && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Track selector tabs/cards */}
-            <div className="space-y-3">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Choose Capstone Track Path</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <div className="space-y-2">
+              <label className="text-[11px] font-medium text-[#888888] uppercase tracking-wider block">Choose Capstone Track Path</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {(['thesis', 'project', 'internship'] as const).map(track => {
                   const isSelected = thesisTrack === track;
                   let desc = "";
@@ -2965,20 +3051,20 @@ export default function Home() {
                         setThesisTrack(track);
                         saveStateToLocalStorage(mode, isOnboarded, semesters, track, thesisSteps, projectCompleted, internshipCompleted, onboardingData);
                       }}
-                      className={`p-4 sm:p-5 rounded-2xl border text-left flex flex-col justify-between transition-all duration-200 cursor-pointer group ${
+                      className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all duration-200 cursor-pointer group shadow-vercel-subtle ${
                         isSelected 
-                          ? 'border-purple-500 bg-purple-950/25 text-white font-semibold shadow-[0_0_20px_rgba(168,85,247,0.2)]' 
-                          : 'bg-[#0a0a10] border border-white/[0.08] hover:border-white/[0.18] hover:bg-[#0e0e14] text-slate-400 hover:text-white'
+                          ? 'border-[#171717] dark:border-[#ededed] bg-[#fafafa] dark:bg-[#141414]' 
+                          : 'bg-white dark:bg-[#0f0f0f] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555]'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`font-bold text-sm ${isSelected ? 'text-purple-300 font-extrabold' : 'text-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className={`font-semibold text-xs ${isSelected ? 'text-[#171717] dark:text-[#ededed]' : 'text-[#888888]'}`}>
                             {title}
                           </span>
-                          <span className={`h-2.5 w-2.5 rounded-full transition ${isSelected ? 'bg-purple-400 shadow-[0_0_8px_#c084fc]' : 'bg-slate-700'}`} />
+                          <span className={`h-2 w-2 rounded-full transition ${isSelected ? 'bg-[#0070f3]' : 'bg-[#d4d4d8] dark:bg-[#333]'}`} />
                         </div>
-                        <p className="text-xs leading-relaxed text-slate-400 group-hover:text-slate-300 transition">
+                        <p className="text-xs text-[#888888] leading-relaxed">
                           {desc}
                         </p>
                       </div>
@@ -2989,13 +3075,13 @@ export default function Home() {
             </div>
 
             {/* Checklist & Grade details */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-white/[0.06]">
-              <div className="space-y-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Milestone Checklist</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-3 border-t border-[#ebebeb] dark:border-[#262626]">
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium text-[#888888] uppercase tracking-wider">Milestone Checklist</p>
                 
                 {thesisTrack === 'thesis' && (
-                  <div className="space-y-3 bg-[#0a0a10] border border-white/[0.08] p-5 rounded-2xl">
-                    <div className="flex items-center gap-3 text-xs text-slate-200 select-none">
+                  <div className="space-y-2.5 bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl">
+                    <div className="flex items-center gap-2.5 text-xs text-[#171717] dark:text-[#ededed] select-none">
                       <button
                         type="button"
                         onClick={() => {
@@ -3003,14 +3089,14 @@ export default function Home() {
                           setThesisSteps(updatedSteps);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, updatedSteps, projectCompleted, internshipCompleted, onboardingData);
                         }}
-                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none ${
+                        className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none ${
                           thesisSteps.step1
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                            : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                            ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]'
                         }`}
                       >
                         {thesisSteps.step1 && (
-                          <Check className="h-3 w-3 text-white stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         )}
                       </button>
                       <span
@@ -3019,12 +3105,12 @@ export default function Home() {
                           setThesisSteps(updatedSteps);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, updatedSteps, projectCompleted, internshipCompleted, onboardingData);
                         }}
-                        className="cursor-pointer hover:text-white transition-colors font-medium"
+                        className="cursor-pointer hover:underline font-medium text-xs"
                       >
                         Step 1: Thesis Topic &amp; Advisor Approved
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-200 select-none">
+                    <div className="flex items-center gap-2.5 text-xs text-[#171717] dark:text-[#ededed] select-none">
                       <button
                         type="button"
                         onClick={() => {
@@ -3032,14 +3118,14 @@ export default function Home() {
                           setThesisSteps(updatedSteps);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, updatedSteps, projectCompleted, internshipCompleted, onboardingData);
                         }}
-                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none ${
+                        className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none ${
                           thesisSteps.step2
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                            : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                            ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]'
                         }`}
                       >
                         {thesisSteps.step2 && (
-                          <Check className="h-3 w-3 text-white stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         )}
                       </button>
                       <span
@@ -3048,28 +3134,28 @@ export default function Home() {
                           setThesisSteps(updatedSteps);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, updatedSteps, projectCompleted, internshipCompleted, onboardingData);
                         }}
-                        className="cursor-pointer hover:text-white transition-colors font-medium"
+                        className="cursor-pointer hover:underline font-medium text-xs"
                       >
                         Step 2: Mid-term defense cleared
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-200 select-none">
+                    <div className="flex items-center gap-2.5 text-xs text-[#171717] dark:text-[#ededed] select-none">
                       <button
                         type="button"
                         onClick={() => handleThesisStep3Toggle(!thesisSteps.step3)}
-                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none ${
+                        className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none ${
                           thesisSteps.step3
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                            : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                            ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]'
                         }`}
                       >
                         {thesisSteps.step3 && (
-                          <Check className="h-3 w-3 text-white stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         )}
                       </button>
                       <span
                         onClick={() => handleThesisStep3Toggle(!thesisSteps.step3)}
-                        className="font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors"
+                        className="font-medium text-xs cursor-pointer hover:underline"
                       >
                         Step 3: Final defense report defended &amp; approved
                       </span>
@@ -3078,8 +3164,8 @@ export default function Home() {
                 )}
 
                 {thesisTrack === 'project' && (
-                  <div className="bg-[#0a0a10] border border-white/[0.08] p-5 rounded-2xl">
-                    <div className="flex items-start gap-3 text-xs text-slate-200 select-none">
+                  <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl">
+                    <div className="flex items-start gap-2.5 text-xs text-[#171717] dark:text-[#ededed] select-none">
                       <button
                         type="button"
                         onClick={() => {
@@ -3088,14 +3174,14 @@ export default function Home() {
                           handleCSE400CompletionToggle(nextVal);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, thesisSteps, nextVal, internshipCompleted, onboardingData);
                         }}
-                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none mt-0.5 ${
+                        className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none mt-0.5 ${
                           projectCompleted
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                            : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                            ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]'
                         }`}
                       >
                         {projectCompleted && (
-                          <Check className="h-3 w-3 text-white stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         )}
                       </button>
                       <div
@@ -3107,16 +3193,16 @@ export default function Home() {
                         }}
                         className="cursor-pointer"
                       >
-                        <p className="font-semibold text-white hover:text-purple-300 transition-colors">Final Project Built &amp; Defended</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">Marks capstone complete and awards 4 degree credits</p>
+                        <p className="font-medium text-xs text-[#171717] dark:text-[#ededed]">Final Project Built &amp; Defended</p>
+                        <p className="text-[11px] text-[#888888] mt-0.5">Marks capstone complete and awards 4 degree credits</p>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {thesisTrack === 'internship' && (
-                  <div className="bg-[#0a0a10] border border-white/[0.08] p-5 rounded-2xl">
-                    <div className="flex items-start gap-3 text-xs text-slate-200 select-none">
+                  <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl">
+                    <div className="flex items-start gap-2.5 text-xs text-[#171717] dark:text-[#ededed] select-none">
                       <button
                         type="button"
                         onClick={() => {
@@ -3125,14 +3211,14 @@ export default function Home() {
                           handleCSE400CompletionToggle(nextVal);
                           saveStateToLocalStorage(mode, isOnboarded, semesters, thesisTrack, thesisSteps, projectCompleted, nextVal, onboardingData);
                         }}
-                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none mt-0.5 ${
+                        className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none mt-0.5 ${
                           internshipCompleted
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                            : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                            ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#161616]'
                         }`}
                       >
                         {internshipCompleted && (
-                          <Check className="h-3 w-3 text-white stroke-[3]" />
+                          <Check className="h-3 w-3 stroke-[3]" />
                         )}
                       </button>
                       <div
@@ -3144,8 +3230,8 @@ export default function Home() {
                         }}
                         className="cursor-pointer"
                       >
-                        <p className="font-semibold text-white hover:text-purple-300 transition-colors">Internship Completed &amp; Report Submitted</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">Marks capstone complete and awards 4 degree credits</p>
+                        <p className="font-medium text-xs text-[#171717] dark:text-[#ededed]">Internship Completed &amp; Report Submitted</p>
+                        <p className="text-[11px] text-[#888888] mt-0.5">Marks capstone complete and awards 4 degree credits</p>
                       </div>
                     </div>
                   </div>
@@ -3153,15 +3239,15 @@ export default function Home() {
               </div>
 
               {mode === 'gpa' && (
-                <div className="space-y-3 bg-[#0a0a10] border border-white/[0.08] p-5 rounded-2xl flex flex-col justify-between">
+                <div className="space-y-3 bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl flex flex-col justify-between">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Final Capstone Grade</label>
-                    <p className="text-xs text-slate-400 leading-relaxed">Select the final grade scored in CSE400 for cumulative CGPA calculation.</p>
+                    <label className="text-[11px] font-medium text-[#888888] uppercase tracking-wider block mb-1">Final Capstone Grade</label>
+                    <p className="text-xs text-[#888888] leading-relaxed">Select the final grade scored in CSE400 for cumulative CGPA calculation.</p>
                   </div>
                   <select
                     value={cse400Course?.grade || ""}
                     onChange={(e) => handleCSE400GradeChange(e.target.value)}
-                    className="bg-[#050508] border border-white/[0.1] text-xs text-slate-100 rounded-xl px-3.5 py-2.5 w-full focus:border-purple-400 outline-none cursor-pointer mt-3 font-semibold shadow-inner transition"
+                    className="bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-xs text-[#171717] dark:text-[#ededed] rounded-lg px-3 py-2 w-full focus:outline-none cursor-pointer mt-2 font-medium shadow-vercel-subtle transition"
                   >
                     <option value="">Select Grade</option>
                     {Object.keys(GRADING_SCALE).map(g => (
@@ -3179,58 +3265,28 @@ export default function Home() {
 
   if (!isMounted) {
     return (
-      <div className="min-h-screen w-full bg-[#030303] bg-gradient-to-b from-[#050507] via-[#09090b] to-[#0d0d12] text-slate-100 font-sans antialiased flex flex-col justify-between relative overflow-hidden animate-pulse">
+      <div className="min-h-screen w-full bg-[#fafafa] dark:bg-[#000000] text-[#171717] dark:text-[#ededed] font-sans antialiased flex flex-col justify-between relative overflow-hidden animate-pulse">
         {/* Header Skeleton */}
-        <header className="px-6 py-5 max-w-7xl mx-auto w-full flex items-center justify-between border-b border-slate-900/50 relative z-10">
+        <header className="px-6 py-4 max-w-7xl mx-auto w-full flex items-center justify-between border-b border-[#ebebeb] dark:border-[#262626] relative z-10">
           <div className="flex items-center gap-3">
-            <div className="h-8.5 w-8.5 rounded-xl bg-slate-800/50" />
-            <div className="space-y-1.5">
-              <div className="h-4.5 w-20 bg-slate-800/60 rounded" />
-              <div className="h-3 w-40 bg-slate-800/40 rounded" />
-            </div>
+            <div className="h-8 w-8 rounded-lg bg-black/10 dark:bg-white/10" />
+            <div className="h-4 w-24 bg-black/10 dark:bg-white/10 rounded" />
           </div>
-          <div className="h-8 w-24 bg-slate-800/50 rounded-xl" />
+          <div className="h-8 w-24 bg-black/10 dark:bg-white/10 rounded-full" />
         </header>
 
         {/* Hero Section Skeleton */}
         <main className="flex-grow flex flex-col items-center justify-center text-center px-4 py-16 relative z-10 max-w-6xl mx-auto w-full">
-          {/* Badge Skeleton */}
-          <div className="h-7 w-48 bg-slate-800/45 rounded-full mb-8" />
-
-          {/* Title Skeleton */}
-          <div className="h-16 w-3/4 max-w-xl bg-slate-800/60 rounded-2xl mb-6 mx-auto" />
-          
-          {/* Subtitle Skeletons */}
-          <div className="space-y-2.5 mb-10 w-2/3 max-w-md mx-auto">
-            <div className="h-6 w-full bg-slate-800/50 rounded-lg mx-auto" />
-            <div className="h-5 w-5/6 bg-slate-800/30 rounded-lg mx-auto" />
-          </div>
-
-          {/* Button Skeleton */}
-          <div className="h-14 w-52 bg-slate-800/70 rounded-full mb-20 mx-auto" />
-
-          {/* Grid Skeleton */}
-          <div className="w-full">
-            <div className="h-4 w-28 bg-slate-800/40 rounded mx-auto mb-10" />
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-zinc-950/40 border border-slate-800/80 rounded-xl p-6 flex flex-col items-center">
-                  <div className="h-12 w-12 rounded-xl bg-slate-800/50 mb-4" />
-                  <div className="h-4 w-24 bg-slate-800/60 rounded mb-2.5" />
-                  <div className="space-y-1.5 w-full">
-                    <div className="h-3 w-full bg-slate-800/35 rounded" />
-                    <div className="h-3 w-5/6 bg-slate-800/30 rounded mx-auto" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <div className="h-6 w-48 bg-black/10 dark:bg-white/10 rounded-full mb-8" />
+          <div className="h-14 w-3/4 max-w-xl bg-black/10 dark:bg-white/10 rounded-2xl mb-6 mx-auto" />
+          <div className="h-5 w-2/3 max-w-md bg-black/10 dark:bg-white/10 rounded mb-10 mx-auto" />
+          <div className="h-12 w-52 bg-black/10 dark:bg-white/10 rounded-full mb-16 mx-auto" />
         </main>
         
         {/* Footer Skeleton */}
-        <footer className="px-6 py-6 border-t border-slate-900/50 max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="h-3.5 w-36 bg-slate-800/30 rounded" />
-          <div className="h-3.5 w-44 bg-slate-800/30 rounded" />
+        <footer className="px-6 py-6 border-t border-[#ebebeb] dark:border-[#262626] max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="h-3 w-36 bg-black/10 dark:bg-white/10 rounded" />
+          <div className="h-3 w-44 bg-black/10 dark:bg-white/10 rounded" />
         </footer>
       </div>
     );
@@ -3238,348 +3294,580 @@ export default function Home() {
 
   const currentLayout = viewMode;
 
-  // 🚀 LANDING PAGE VIEW (Shown by default on first visit or when unauthenticated)
-  // 🚀 LANDING PAGE VIEW (Shown by default on first visit or when unauthenticated)
+  // 🚀 LANDING PAGE VIEW (Vercel-inspired Developer Platform design)
   if (!showDashboard || (!cloudUser && !isGuest)) {
     return (
-      <div className="min-h-screen w-full bg-[#030304] bg-gradient-to-b from-[#030304] via-[#070913] to-[#030304] text-slate-100 font-sans antialiased flex flex-col justify-between relative overflow-hidden">
-        {/* Ambient background glow accents: Blue & Indigo */}
-        <div className="absolute top-[-15%] left-[-8%] w-[55%] h-[55%] rounded-full bg-blue-600/[0.08] blur-[160px] pointer-events-none" />
-        <div className="absolute bottom-[-15%] right-[-8%] w-[55%] h-[55%] rounded-full bg-indigo-600/[0.08] blur-[160px] pointer-events-none" />
-        <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full bg-blue-500/[0.05] blur-[180px] pointer-events-none z-0" />
+      <div className="min-h-screen w-full bg-[#fafafa] dark:bg-[#050505] text-[#171717] dark:text-[#ededed] font-sans antialiased flex flex-col justify-between relative overflow-x-hidden transition-colors duration-200">
+        {/* Vercel Structural Grid + Atmospheric Radial Spotlight */}
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808014_1px,transparent_1px),linear-gradient(to_bottom,#80808014_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:radial-gradient(ellipse_85%_65%_at_50%_15%,#000_65%,transparent_100%)]" />
+          <div className="absolute -top-36 left-1/2 -translate-x-1/2 w-[780px] h-[380px] bg-gradient-to-tr from-[#0070f3]/12 via-cyan-500/8 to-transparent rounded-full blur-[110px]" />
+        </div>
 
-        {/* Top Header/Bar for Landing */}
-        <header className="px-6 py-5 max-w-7xl mx-auto w-full flex items-center justify-between border-b border-white/[0.08] relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-500 border border-indigo-400/30 flex items-center justify-center shadow-[0_4px_25px_rgba(99,102,241,0.35)] shrink-0">
-              <svg className="h-5.5 w-5.5 text-white fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-black tracking-tight text-white">
-              Flow136
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {cloudUser && (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                <div className="h-6 w-6 rounded-full overflow-hidden bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 font-bold text-[10px] shrink-0">
-                  {cloudUser.picture ? (
-                    <img src={cloudUser.picture} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span>{cloudUser.name?.[0]?.toUpperCase() || "U"}</span>
-                  )}
-                </div>
-                <span className="text-xs font-semibold text-slate-200 hidden sm:inline max-w-[120px] truncate">{cloudUser.name}</span>
+        {/* Top Navigation Bar */}
+        <header className="sticky top-0 z-30 w-full border-b border-[#ebebeb] dark:border-[#1f1f1f] bg-[#fafafa]/80 dark:bg-[#050505]/80 backdrop-blur-xl transition-colors">
+          <div className="px-4 sm:px-6 h-14 max-w-7xl mx-auto w-full flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-[#171717] dark:bg-[#ededed] flex items-center justify-center text-white dark:text-[#171717] shadow-vercel-subtle shrink-0">
+                <svg className="h-4 w-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+                </svg>
               </div>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (!cloudUser && !isGuest) {
-                  handleContinueAsGuest();
-                } else {
-                  setShowDashboard(true);
-                }
-              }}
-              className="px-4 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 hover:border-blue-400/50 text-xs font-bold text-blue-300 hover:text-white transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
-            >
-              <span>{cloudUser ? "Open Tracker" : (isGuest ? "Open Tracker" : "Enter Tracker")}</span>
-              <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
-            </button>
+              <span className="text-sm sm:text-base font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                Route136
+              </span>
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-[#f0f0f0] dark:bg-[#141414] text-[#666666] dark:text-[#888888] border border-[#e5e5e5] dark:border-[#262626]">
+                BRACU CSE • 136 Cr
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              {/* Theme Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                className="h-8 w-8 rounded-lg border border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] text-[#4d4d4d] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition cursor-pointer shadow-vercel-subtle"
+              >
+                {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              </button>
+
+              {cloudUser && (
+                <div className="flex items-center gap-2 px-2.5 h-8 rounded-lg bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] shadow-vercel-subtle">
+                  <div className="h-4.5 w-4.5 rounded-full overflow-hidden bg-[#171717] text-white flex items-center justify-center font-semibold text-[9px] shrink-0">
+                    {cloudUser.picture ? (
+                      <img src={cloudUser.picture} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{cloudUser.name?.[0]?.toUpperCase() || "U"}</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-[#171717] dark:text-[#ededed] hidden sm:inline max-w-[120px] truncate">{cloudUser.name}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!cloudUser && !isGuest) {
+                    handleContinueAsGuest();
+                  } else {
+                    setShowDashboard(true);
+                  }
+                }}
+                className="h-8 px-3.5 rounded-lg bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-xs font-medium text-white dark:text-[#0a0a0a] transition-all flex items-center gap-1.5 cursor-pointer shadow-vercel-subtle active:scale-95"
+              >
+                <span>{cloudUser || isGuest ? "Open Workspace" : "Launch Tracker"}</span>
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Hero Section */}
-        <main className="flex-grow flex flex-col items-center justify-center text-center px-4 py-16 relative z-10 max-w-6xl mx-auto w-full">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs font-semibold text-blue-300 mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-            <GraduationCap className="h-4 w-4 text-blue-400" />
-            <span>BRACU CSE Degree Companion</span>
-          </div>
-
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-blue-400 max-w-5xl mx-auto leading-none mb-6">
-            Welcome to Flow136
-          </h1>
-
-          <p className="text-xl md:text-2xl lg:text-3xl text-slate-100 font-extrabold tracking-tight max-w-2xl mx-auto leading-relaxed text-center">
-            Your curriculum, minus the complexity.
-          </p>
-
-          <p className="text-xs md:text-sm text-slate-400 font-medium mt-3 mb-10 max-w-md mx-auto leading-relaxed text-center">
-            Interactive progress tracker, prerequisite validator &amp; graduation planner for BRACU CSE.
-          </p>
-
-          {/* Integrated Decluttered Auth & Access Card */}
-          <div className="w-full max-w-md mx-auto mb-16 bg-[#070913]/95 border border-blue-500/25 rounded-3xl p-6 sm:p-7 backdrop-blur-2xl shadow-[0_20px_70px_rgba(59,130,246,0.15)] relative overflow-hidden flex flex-col gap-4 text-center">
-            {/* Ambient internal card glow */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/[0.10] rounded-full blur-2xl pointer-events-none" />
-
-            {/* Error Denial Alert */}
-            {gatekeeperError && (
-              <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-left space-y-1 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
-                  <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />
-                  <span>Access Blocked by Gatekeeper</span>
-                </div>
-                <p className="text-[11px] text-rose-200/90 leading-relaxed font-medium">
-                  {gatekeeperError}
-                </p>
-              </div>
-            )}
-
-            {!cloudUser && !isGuest ? (
-              <>
-                {/* Option A (Primary): Sign in (G-Suite) */}
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    disabled={isAuthenticating}
-                    onClick={() => handleCloudSignIn()}
-                    className="w-full py-3.5 px-4 bg-white hover:bg-slate-100 text-slate-900 font-black text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-3 transition-all shadow-[0_4px_25px_rgba(59,130,246,0.25)] hover:shadow-[0_6px_30px_rgba(59,130,246,0.35)] active:scale-[0.98] cursor-pointer disabled:opacity-60 border border-white"
-                  >
-                    {isAuthenticating ? (
-                      <RefreshCw className="h-4.5 w-4.5 animate-spin text-slate-700" />
-                    ) : (
-                      <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-                      </svg>
-                    )}
-                    <span>{isAuthenticating ? "Connecting to Google..." : "Sign in (G-Suite)"}</span>
-                  </button>
-
-                  <div className="flex items-center justify-center gap-2 text-[11px] text-blue-300/80 font-medium pt-0.5">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                    </span>
-                    <span>Auto-syncs via Google Drive</span>
-                  </div>
-                </div>
-
-                {/* Clean minimal Divider */}
-                <div className="flex items-center gap-3 py-1">
-                  <div className="flex-1 h-px bg-white/[0.08]" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">OR</span>
-                  <div className="flex-1 h-px bg-white/[0.08]" />
-                </div>
-
-                {/* Option B (Secondary): Continue as Guest */}
-                <button
-                  type="button"
-                  onClick={handleContinueAsGuest}
-                  className="w-full py-3 px-4 text-slate-200 hover:text-white transition-all text-xs font-semibold cursor-pointer rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center justify-center gap-2 group active:scale-[0.98]"
-                >
-                  <span>Continue as Guest (Local Storage Only)</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </>
-            ) : cloudUser ? (
-              <div className="space-y-3">
-                <div className="p-3 rounded-2xl bg-[#090b16] border border-blue-500/25 flex items-center justify-between text-left">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-xl overflow-hidden bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 font-bold text-xs shrink-0">
-                      {cloudUser.picture ? (
-                        <img src={cloudUser.picture} alt={cloudUser.name || "Profile"} className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{cloudUser.name?.[0]?.toUpperCase() || "U"}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{cloudUser.name}</p>
-                      <p className="text-[10px] text-blue-400 font-mono truncate">{cloudUser.email}</p>
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-300 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 shrink-0">
-                    <Cloud className="h-3 w-3" />
-                    Synced
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDashboard(true);
-                  }}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-[0_0_28px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)] transition-all cursor-pointer active:scale-[0.98] border border-indigo-400/40"
-                >
-                  <span>Open Degree Tracker</span>
-                  <ArrowRight className="h-5 w-5 text-white" />
-                </button>
-
-                <div className="flex items-center justify-center gap-3 text-xs text-zinc-400 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleCloudSignOut}
-                    className="text-zinc-400 hover:text-rose-400 transition cursor-pointer"
-                  >
-                    Sign Out
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="p-3 rounded-2xl bg-[#090b16] border border-blue-500/25 flex items-center justify-between text-left">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                      <User className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white">Guest Session</p>
-                      <p className="text-[10px] text-blue-400/80">Stored locally on this device</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-blue-300 px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 shrink-0">
-                    Local Only
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDashboard(true);
-                  }}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-[0_0_28px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)] transition-all cursor-pointer active:scale-[0.98] border border-indigo-400/40"
-                >
-                  <span>Open Degree Tracker</span>
-                  <ArrowRight className="h-5 w-5 text-white" />
-                </button>
-
-                <div className="flex items-center justify-center gap-3 text-xs pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsGuest(false);
-                      try { localStorage.removeItem(STORAGE_KEYS.IS_GUEST); } catch {}
-                    }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold transition cursor-pointer"
-                  >
-                    Sign in with BRACU account for cloud backup
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Feature Highlights Grid */}
-          <div className="w-full">
-            <div className="text-center mb-10">
-              <h2 className="text-xs uppercase tracking-widest text-blue-400 font-bold">Core Features</h2>
-              <div className="h-1 w-12 bg-gradient-to-r from-blue-500 to-indigo-500 mx-auto mt-2 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-            </div>
+        {/* Main Hero & Showcase Container */}
+        <main className="flex-grow relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-10 sm:pt-16 pb-20 space-y-20">
+          
+          {/* Top Split Hero: Left Copy + Auth Card, Right Interactive Product Preview */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
             
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
-              {/* Feature 1 */}
-              <div className="bg-[#070913]/90 border border-blue-500/20 hover:border-blue-500/45 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all duration-300 group hover:-translate-y-1.5">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-4 group-hover:bg-blue-500/25 group-hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
-                  <GraduationCap className="h-6 w-6" />
+            {/* Left Column: Value Proposition & Auth Portal (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left">
+              {/* Eyebrow Status Pill */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] text-[11px] font-mono text-[#4d4d4d] dark:text-[#a1a1a1] mb-5 shadow-vercel-subtle">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
+                <span>BRACU CSE Degree Architecture</span>
+                <span className="text-[#cccccc] dark:text-[#333333]">|</span>
+                <span className="text-[#0070f3] font-medium">136 Credits</span>
+              </div>
+
+              {/* Vercel High-Contrast Headline */}
+              <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.1] bg-clip-text text-transparent bg-gradient-to-b from-[#171717] via-[#171717] to-[#666666] dark:from-[#ffffff] dark:via-[#ededed] dark:to-[#888888] mb-4">
+                Your CSE curriculum, engineered for clarity.
+              </h1>
+
+              <p className="text-sm sm:text-[15px] text-[#555555] dark:text-[#999999] font-normal mb-7 max-w-md leading-relaxed">
+                Plan every semester from <span className="font-mono text-xs text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#161616] px-1.5 py-0.5 rounded border border-[#e5e5e5] dark:border-[#262626]">CSE110</span> to <span className="font-mono text-xs text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#161616] px-1.5 py-0.5 rounded border border-[#e5e5e5] dark:border-[#262626]">CSE400</span> with live prerequisite locks, 5-stream GenEd validation, and CGPA trajectory modeling.
+              </p>
+
+              {/* Auth / Access Surface Card */}
+              <div className="w-full max-w-md bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col gap-3.5 text-center transition-colors">
+                <div className="flex items-center justify-between pb-2.5 border-b border-[#f0f0f0] dark:border-[#1f1f1f]">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-[#666666] dark:text-[#888888]">
+                    Workspace Access
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Client-Side Private
+                  </span>
                 </div>
-                <h3 className="text-sm font-bold text-white mb-2">CGPA Tracker</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                  Log grades, track semester GPAs, and monitor cumulative progress dynamically.
+
+                {/* Error Denial Alert */}
+                {gatekeeperError && (
+                  <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-left space-y-1 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-medium text-xs">
+                      <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <span>Access Blocked by Gatekeeper</span>
+                    </div>
+                    <p className="text-[11px] text-rose-600 dark:text-rose-300 leading-relaxed font-normal">
+                      {gatekeeperError}
+                    </p>
+                  </div>
+                )}
+
+                {!cloudUser && !isGuest ? (
+                  <>
+                    {/* Option A: Primary Action (G-Suite) */}
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        disabled={isAuthenticating}
+                        onClick={() => handleCloudSignIn()}
+                        className="w-full h-10 px-4 bg-[#171717] hover:bg-black/90 dark:bg-[#ededed] dark:hover:bg-white text-white dark:text-[#0a0a0a] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2.5 transition-all shadow-vercel-subtle active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                      >
+                        {isAuthenticating ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                          </svg>
+                        )}
+                        <span>{isAuthenticating ? "Connecting..." : "Continue with BRACU G-Suite"}</span>
+                      </button>
+
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#888888] font-mono">
+                        <Cloud className="h-3 w-3 text-[#0070f3]" />
+                        <span>Encrypted backup in your personal Google Drive</span>
+                      </div>
+                    </div>
+
+                    {/* Minimalist Divider */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-[#ebebeb] dark:bg-[#222222]" />
+                      <span className="text-[10px] font-mono text-[#888888]">OR</span>
+                      <div className="flex-1 h-px bg-[#ebebeb] dark:bg-[#222222]" />
+                    </div>
+
+                    {/* Option B: Continue as Guest */}
+                    <button
+                      type="button"
+                      onClick={handleContinueAsGuest}
+                      className="w-full h-9 px-4 text-[#171717] dark:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#161616] transition-all text-xs font-medium cursor-pointer rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center gap-2 group active:scale-[0.98]"
+                    >
+                      <span>Continue as Guest (Local Browser Storage)</span>
+                      <ArrowRight className="h-3 w-3 text-[#888888] group-hover:text-[#171717] dark:group-hover:text-[#ededed] group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </>
+                ) : cloudUser ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-left">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-full overflow-hidden bg-[#171717] text-white flex items-center justify-center font-semibold text-xs shrink-0">
+                          {cloudUser.picture ? (
+                            <img src={cloudUser.picture} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span>{cloudUser.name?.[0]?.toUpperCase() || "U"}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] truncate">{cloudUser.name}</p>
+                          <p className="text-[10px] text-[#888888] font-mono truncate">{cloudUser.email}</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[#0070f3] px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 shrink-0">
+                        <Cloud className="h-3 w-3" />
+                        Synced
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowDashboard(true)}
+                      className="w-full h-10 px-5 bg-[#171717] hover:bg-black/90 dark:bg-[#ededed] dark:hover:bg-white text-white dark:text-[#0a0a0a] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-vercel-subtle"
+                    >
+                      <span>Open Degree Tracker</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+
+                    <div className="flex items-center justify-center gap-3 text-xs text-[#888888]">
+                      <button
+                        type="button"
+                        onClick={handleCloudSignOut}
+                        className="hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-left">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-full bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#4d4d4d] dark:text-[#a1a1a1] shrink-0">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">Guest Session</p>
+                          <p className="text-[10px] text-[#888888] font-mono">Saved in local storage</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 border border-[#ebebeb] dark:border-[#262626] shrink-0">
+                        Local Only
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowDashboard(true)}
+                      className="w-full h-10 px-5 bg-[#171717] hover:bg-black/90 dark:bg-[#ededed] dark:hover:bg-white text-white dark:text-[#0a0a0a] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-vercel-subtle"
+                    >
+                      <span>Open Degree Tracker</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+
+                    <div className="flex items-center justify-center gap-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGuest(false);
+                          try { localStorage.removeItem(STORAGE_KEYS.IS_GUEST); } catch {}
+                        }}
+                        className="text-[#0070f3] hover:underline font-medium transition cursor-pointer"
+                      >
+                        Sign in with BRACU account for cloud backup
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Micro-metrics row under auth card */}
+              <div className="mt-5 flex flex-wrap items-center justify-center lg:justify-start gap-4 text-[11px] font-mono text-[#666666] dark:text-[#888888]">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span>136-Cr Official Syllabus</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span>Hard &amp; Soft Prereq Engine</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Right Column: Interactive Product Preview Mockup (7 cols) */}
+            <div className="lg:col-span-7 w-full">
+              <div className="rounded-2xl bg-white dark:bg-[#0c0c0c] border border-[#e5e5e5] dark:border-[#242424] shadow-vercel-modal overflow-hidden text-left">
+                {/* Window Chrome Bar */}
+                <div className="px-4 py-2.5 bg-[#fafafa] dark:bg-[#111111] border-b border-[#ebebeb] dark:border-[#222222] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#e5e5e5] dark:bg-[#2a2a2a]" />
+                  </div>
+                  <div className="px-3 py-0.5 rounded-md bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#222222] text-[10px] font-mono text-[#888888] flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span>route136.app/workspace</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/20 px-2 py-0.5 rounded">
+                    LIVE PREVIEW
+                  </span>
+                </div>
+
+                {/* Mockup Body */}
+                <div className="p-4 sm:p-5 space-y-4">
+                  {/* Top Metric Strip */}
+                  <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                        <span>DEGREE PROGRESS</span>
+                        <span className="text-[#0070f3] font-semibold">79.4%</span>
+                      </div>
+                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
+                        108 <span className="text-xs font-normal text-[#888888]">/ 136 Cr</span>
+                      </div>
+                      <div className="mt-2 h-1.5 w-full rounded-full bg-[#eaeaea] dark:bg-[#222222] overflow-hidden">
+                        <div className="h-full w-[79%] bg-[#0070f3] rounded-full" />
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                        <span>CUMULATIVE GPA</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">HONS</span>
+                      </div>
+                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
+                        3.74 <span className="text-xs font-normal text-[#888888]">/ 4.00</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1 text-[10px] font-mono text-[#888888]">
+                        <span>Target:</span>
+                        <span className="text-[#171717] dark:text-[#ededed] font-medium">3.80</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#222222]">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#888888] mb-1">
+                        <span>GENED STREAMS</span>
+                        <span className="text-[#171717] dark:text-[#ededed]">5/5</span>
+                      </div>
+                      <div className="text-base sm:text-lg font-semibold font-mono text-[#171717] dark:text-[#ededed]">
+                        36 <span className="text-xs font-normal text-[#888888]">/ 39 Cr</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1">
+                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
+                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
+                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
+                        <span className="h-1.5 flex-1 rounded-full bg-[#0070f3]" />
+                        <span className="h-1.5 flex-1 rounded-full bg-[#eaeaea] dark:bg-[#262626]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mockup Semester Columns */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Sample Semester Card 1 */}
+                    <div className="rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] p-3 space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="h-4 w-4 rounded bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] flex items-center justify-center text-[10px] font-bold">✓</span>
+                          <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Semester 3 • Fall</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                          <span className="px-1.5 py-0.5 rounded bg-white dark:bg-[#191919] border border-[#ebebeb] dark:border-[#262626] text-[#666666] dark:text-[#999999]">12 Cr</span>
+                          <span className="px-1.5 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3] font-semibold">SGPA 3.83</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {[
+                          { code: "CSE220", title: "Data Structures", grade: "A (4.0)", tag: "Core" },
+                          { code: "CSE230", title: "Discrete Mathematics", grade: "A (4.0)", tag: "Core" },
+                          { code: "MAT215", title: "Complex Variables & Laplace", grade: "A- (3.7)", tag: "Math" },
+                          { code: "STA201", title: "Elements of Statistics", grade: "B+ (3.3)", tag: "Sci" },
+                        ].map((item) => (
+                          <div key={item.code} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
+                              <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
+                            </div>
+                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#222222] text-[#171717] dark:text-[#ededed] shrink-0">
+                              {item.grade}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sample Semester Card 2 + Dependency Validator Preview */}
+                    <div className="rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#222222] p-3 flex flex-col justify-between space-y-2.5">
+                      <div>
+                        <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#222222] pb-2 mb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="h-4 w-4 rounded bg-[#0070f3] text-white flex items-center justify-center text-[9px] font-mono font-bold">RS</span>
+                            <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Residential Semester</span>
+                          </div>
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3]">
+                            Savar Campus
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {[
+                            { code: "ENG102", title: "English Composition I", status: "Stream 1" },
+                            { code: "EMB101", title: "Emergence of Bangladesh", status: "Stream 3" },
+                            { code: "HUM103", title: "Ethics and Culture", status: "Stream 4" },
+                          ].map((item) => (
+                            <div key={item.code} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono text-[11px] font-semibold text-[#171717] dark:text-[#ededed]">{item.code}</span>
+                                <span className="text-[11px] text-[#777777] truncate">{item.title}</span>
+                              </div>
+                              <span className="font-mono text-[10px] text-[#0070f3] bg-[#0070f3]/10 px-1.5 py-0.5 rounded shrink-0">
+                                {item.status}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Prerequisite Chain Status Pill */}
+                      <div className="p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#666666] dark:text-[#999999]">
+                          <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE111</span>
+                          <span>→</span>
+                          <span className="text-[#171717] dark:text-[#ededed] font-semibold">CSE220</span>
+                          <span>→</span>
+                          <span className="text-[#0070f3] font-semibold">CSE221</span>
+                        </div>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          PREREQS VALID
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Vercel Architectural Bento Grid Section */}
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-[#ebebeb] dark:border-[#222222] pb-4">
+              <div>
+                <span className="text-[11px] font-mono text-[#0070f3] uppercase tracking-wider">
+                  [ System Capabilities ]
+                </span>
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#171717] dark:text-[#ededed] mt-1">
+                  Built specifically for BRACU CSE degree rules.
+                </h2>
+              </div>
+              <p className="text-xs text-[#666666] dark:text-[#888888] font-mono">
+                45 Core • 42 Foundation/GenEd • 21 Electives • 4 Cr Thesis
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              {/* Bento Card 1: Prerequisite Validator (3 cols) */}
+              <div className="md:col-span-3 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 sm:p-6 shadow-vercel-card flex flex-col justify-between gap-4 hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed]">
+                      <Layers className="h-4 w-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626]">
+                      DEPENDENCY GRAPH
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-[#171717] dark:text-[#ededed] mb-1.5">
+                    Hard &amp; Soft Prerequisite Validation
+                  </h3>
+                  <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
+                    Automatically flags missing hard prerequisites and advisory soft prerequisites across your timeline before registration week.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
+                  <span className="px-2 py-1 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE110 ✓</span>
+                  <span className="text-[#888888]">→</span>
+                  <span className="px-2 py-1 rounded bg-[#fafafa] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed]">CSE111 ✓</span>
+                  <span className="text-[#888888]">→</span>
+                  <span className="px-2 py-1 rounded bg-[#0070f3]/10 border border-[#0070f3]/30 text-[#0070f3] font-medium">CSE220 Unlocked</span>
+                </div>
+              </div>
+
+              {/* Bento Card 2: CGPA & Target Solver (3 cols) */}
+              <div className="md:col-span-3 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 sm:p-6 shadow-vercel-card flex flex-col justify-between gap-4 hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3]">
+                      <Target className="h-4 w-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-[#888888] px-2 py-0.5 rounded bg-[#f5f5f5] dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626]">
+                      TRAJECTORY ENGINE
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-[#171717] dark:text-[#ededed] mb-1.5">
+                    Target CGPA Solver &amp; Retake ROI Analyzer
+                  </h3>
+                  <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
+                    Calculate the exact GPA required across your remaining credits to hit Vice Chancellor’s List or Dean’s List, and rank past courses by highest CGPA boost on retake.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-[#f0f0f0] dark:border-[#1d1d1d] font-mono text-[11px]">
+                  <span className="text-[#666666] dark:text-[#888888]">Retake Simulation: <strong className="text-[#171717] dark:text-[#ededed]">MAT120 (B → A)</strong></span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">+0.07 CGPA</span>
+                </div>
+              </div>
+
+              {/* Bento Card 3: 5-Stream GenEd Matrix (2 cols) */}
+              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
+                  39-Credit GenEd Matrix
+                </h3>
+                <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
+                  Tracks all 5 mandatory GenEd streams, Residential Semester (RS) courses, and free elective caps without manual spreadsheet formulas.
                 </p>
               </div>
 
-              {/* Feature 2 */}
-              <div className="bg-[#070913]/90 border border-blue-500/20 hover:border-blue-500/45 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all duration-300 group hover:-translate-y-1.5">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-4 group-hover:bg-blue-500/25 group-hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
-                  <BookOpen className="h-6 w-6" />
+              {/* Bento Card 4: List & Kanban Dual Views (2 cols) */}
+              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
+                  <Columns className="h-4 w-4" />
                 </div>
-                <h3 className="text-sm font-bold text-white mb-2">GenEd Progress</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                  Auto-validate GenEd stream distributions and ensure all graduation credits align.
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
+                  List &amp; Kanban Board Views
+                </h3>
+                <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
+                  Switch seamlessly between a detailed vertical semester feed and a horizontal drag-and-scroll Kanban board across desktop and mobile.
                 </p>
               </div>
 
-              {/* Feature 3 */}
-              <div className="bg-[#070913]/90 border border-blue-500/20 hover:border-blue-500/45 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all duration-300 group hover:-translate-y-1.5">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-4 group-hover:bg-blue-500/25 group-hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
-                  <TrendingUp className="h-6 w-6" />
+              {/* Bento Card 5: 4K Snapshot Export (2 cols) */}
+              <div className="md:col-span-2 bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-5 shadow-vercel-card hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all">
+                <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] mb-3">
+                  <Camera className="h-4 w-4" />
                 </div>
-                <h3 className="text-sm font-bold text-white mb-2">Visual Analytics</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                  Visualize your historical GPA growth and trendline trajectory semester by semester.
-                </p>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="bg-[#070913]/90 border border-blue-500/20 hover:border-blue-500/45 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all duration-300 group hover:-translate-y-1.5">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-4 group-hover:bg-blue-500/25 group-hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
-                  <Target className="h-6 w-6" />
-                </div>
-                <h3 className="text-sm font-bold text-white mb-2">Target Calculator</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                  Solve exactly what GPAs you need in future semesters to reach your graduation goals.
-                </p>
-              </div>
-
-              {/* Feature 5 */}
-              <div className="bg-[#070913]/90 border border-blue-500/20 hover:border-blue-500/45 rounded-3xl p-6 backdrop-blur-xl flex flex-col items-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all duration-300 group hover:-translate-y-1.5">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-4 group-hover:bg-blue-500/25 group-hover:scale-110 transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]">
-                  <Camera className="h-6 w-6" />
-                </div>
-                <h3 className="text-sm font-bold text-white mb-2">Snapshot Progress</h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-normal">
-                  Instantly download your official curriculum progress as a crisp PNG grade sheet.
+                <h3 className="text-sm font-semibold text-[#171717] dark:text-[#ededed] mb-1">
+                  Grade Sheet PNG Snapshot
+                </h3>
+                <p className="text-xs text-[#666666] dark:text-[#888888] leading-relaxed">
+                  Generate a clean, shareable academic summary card and full semester transcript image for advising or offline record keeping.
                 </p>
               </div>
             </div>
           </div>
         </main>
 
-        {/* Landing Page Footer */}
-        <footer className="w-full py-10 px-6 border-t border-white/[0.08] bg-[#030304]/90 backdrop-blur-md relative z-10 text-center flex flex-col items-center justify-center gap-5">
-          {/* Connect with me social links */}
-          <div className="flex flex-wrap items-center justify-center gap-3 text-sm font-semibold text-slate-100">
-            <span className="text-xs font-bold text-slate-400 tracking-wider uppercase leading-none self-center">Connect with me:</span>
-            <a
-              href="https://github.com/fakekhanabdullah"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-blue-500/10 hover:border-blue-500/30 text-xs text-slate-300 hover:text-white transition-all duration-200"
-            >
-              <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-              <span>GitHub</span>
-            </a>
-            <a
-              href="https://www.linkedin.com/in/khan-abdullahh"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:bg-blue-500/10 hover:border-blue-500/30 text-xs text-slate-300 hover:text-white transition-all duration-200"
-            >
-              <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-              <span>LinkedIn</span>
-            </a>
-          </div>
+        {/* Vercel Clean Hairline Footer */}
+        <footer className="w-full py-7 px-6 border-t border-[#ebebeb] dark:border-[#1f1f1f] bg-white/60 dark:bg-[#050505]/80 backdrop-blur-md relative z-10 transition-colors">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-xs text-[#666666] dark:text-[#888888]">
+              <span className="font-semibold text-[#171717] dark:text-[#ededed]">Route136</span>
+              <span>•</span>
+              <span className="font-mono text-[11px]">© 2026 Khan Abdullah</span>
+            </div>
 
-          {/* Legal Links for Google OAuth & Compliance */}
-          <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-            <a href="/privacy" className="hover:text-blue-300 underline transition">
-              Privacy Policy
-            </a>
-            <span>•</span>
-            <a href="/terms" className="hover:text-blue-300 underline transition">
-              Terms of Service
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs text-[#4d4d4d] dark:text-[#a1a1a1]">
+              <a
+                href="https://github.com/fakekhanabdullah"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] text-xs text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle"
+              >
+                <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                <span>GitHub</span>
+              </a>
+              <a
+                href="https://www.linkedin.com/in/khan-abdullahh"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] text-xs text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle"
+              >
+                <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                <span>LinkedIn</span>
+              </a>
+              <span className="text-[#888888]">•</span>
+              <a href="/privacy" className="hover:text-[#171717] dark:hover:text-[#ededed] hover:underline transition">
+                Privacy Policy
+              </a>
+              <span className="text-[#888888]">•</span>
+              <a href="/terms" className="hover:text-[#171717] dark:hover:text-[#ededed] hover:underline transition">
+                Terms of Service
+              </a>
+            </div>
           </div>
-
-          {/* Muted Copyright Disclaimer */}
-          <div className="text-xs text-slate-400 leading-relaxed font-normal">
-            <p>© 2026 Flow136. Made by: Khan Abdullah</p>
-          </div>
-
-          <p className="text-[10px] text-slate-500 max-w-md leading-relaxed">
-            Disclaimer: Not officially affiliated with BRAC University. All curriculum guidelines and course codes reflect official CSE program requirements.
-          </p>
         </footer>
 
         {/* Floating Cloud Toast Notification */}
         {cloudToastMessage && (
           <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-200 pointer-events-none">
-            <div className="bg-[#0b0c14]/95 border border-blue-500/30 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl flex items-center gap-2.5">
-              <Cloud className="h-4 w-4 text-blue-400 shrink-0 animate-pulse" />
+            <div className="bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] text-xs font-mono px-4 py-2.5 rounded-full shadow-vercel-modal flex items-center gap-2">
+              <Cloud className="h-4 w-4 text-[#0070f3] shrink-0 animate-pulse" />
               <span>{cloudToastMessage}</span>
             </div>
           </div>
@@ -3590,26 +3878,26 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen w-full bg-[#030306] bg-gradient-to-b from-[#030306] via-[#05060b] to-[#070810] text-slate-100 font-sans antialiased flex flex-col lg:flex-row relative selection:bg-indigo-500/30 selection:text-white">
+    <div className="min-h-screen w-full bg-[#fafafa] dark:bg-[#000000] text-[#171717] dark:text-[#ededed] font-sans antialiased flex flex-col lg:flex-row relative selection:bg-[#171717] selection:text-white dark:selection:bg-[#ededed] dark:selection:text-black">
       {/* 1. Left Vertical Dock (Desktop >= 1024px) */}
-      <aside className="hidden lg:flex w-20 h-screen sticky top-0 bg-[#060814]/95 border-r border-white/[0.08] flex-col items-center justify-between py-6 shrink-0 z-40 backdrop-blur-xl shadow-xl">
+      <aside className="hidden lg:flex w-16 h-screen sticky top-0 bg-white dark:bg-[#000000] border-r border-[#ebebeb] dark:border-[#262626] flex-col items-center justify-between py-5 shrink-0 z-40 transition-colors">
         {/* Top: Logo & Nav Jump Icons */}
-        <div className="flex flex-col items-center gap-6 w-full">
+        <div className="flex flex-col items-center gap-5 w-full">
           {/* Logo */}
           <div 
             onClick={() => setShowDashboard(false)}
-            className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-500 border border-indigo-400/30 flex items-center justify-center shadow-[0_8px_20px_rgba(99,102,241,0.35)] cursor-pointer hover:opacity-90 active:scale-95 transition-all"
-            title="Flow136 - Back to Landing Page"
+            className="h-9 w-9 rounded-lg bg-[#171717] dark:bg-white text-white dark:text-black flex items-center justify-center cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-vercel-subtle"
+            title="Route136 - Back to Landing Page"
           >
-            <svg className="h-6 w-6 text-white fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+            <svg className="h-5 w-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
             </svg>
           </div>
 
-          <div className="w-8 h-px bg-white/[0.08]" />
+          <div className="w-6 h-px bg-[#ebebeb] dark:bg-[#262626]" />
 
           {/* Navigation Jump Icons */}
-          <nav className="flex flex-col items-center gap-3 w-full">
+          <nav className="flex flex-col items-center gap-2 w-full">
             {/* Planner Icon */}
             <button
               type="button"
@@ -3617,10 +3905,10 @@ export default function Home() {
                 const el = document.getElementById("semester-planner-section");
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="h-10 w-10 rounded-2xl bg-white/[0.03] hover:bg-blue-500/15 border border-white/[0.08] hover:border-blue-500/40 text-slate-300 hover:text-blue-400 flex items-center justify-center transition-all cursor-pointer group"
+              className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer group"
               title="Semester Planner"
             >
-              <Calendar className="h-4.5 w-4.5 group-hover:scale-110 transition-transform" />
+              <Calendar className="h-4 w-4 group-hover:scale-105 transition-transform" />
             </button>
 
             {/* CGPA Mode / Graph Icon */}
@@ -3631,14 +3919,14 @@ export default function Home() {
                 const el = document.getElementById("gpa-dashboard-section");
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className={`h-10 w-10 rounded-2xl border flex items-center justify-center transition-all cursor-pointer group ${
+              className={`h-9 w-9 rounded-lg border flex items-center justify-center transition-all cursor-pointer group ${
                 mode === 'gpa'
-                  ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.25)]'
-                  : 'bg-white/[0.03] hover:bg-blue-500/15 border-white/[0.08] hover:border-blue-500/40 text-slate-300 hover:text-blue-400'
+                  ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black shadow-vercel-subtle'
+                  : 'border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
               }`}
-              title="CGPA & Growth Points"
+              title="CGPA & Trajectory"
             >
-              <TrendingUp className="h-4.5 w-4.5 group-hover:scale-110 transition-transform" />
+              <TrendingUp className="h-4 w-4 group-hover:scale-105 transition-transform" />
             </button>
 
             {/* Categories / Curriculum Icon */}
@@ -3648,31 +3936,41 @@ export default function Home() {
                 const el = document.getElementById("category-requirements-section");
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="h-10 w-10 rounded-2xl bg-white/[0.03] hover:bg-blue-500/15 border border-white/[0.08] hover:border-blue-500/40 text-slate-300 hover:text-blue-400 flex items-center justify-center transition-all cursor-pointer group"
+              className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer group"
               title="Category Requirements"
             >
-              <Layers className="h-4.5 w-4.5 group-hover:scale-110 transition-transform" />
+              <Layers className="h-4 w-4 group-hover:scale-105 transition-transform" />
             </button>
 
             {/* Extra Tools / Drawer Toggle Button */}
             <button
               type="button"
               onClick={() => setIsExtraSidebarOpen(prev => !prev)}
-              className={`h-10 w-10 rounded-2xl border flex items-center justify-center transition-all cursor-pointer relative group ${
+              className={`h-9 w-9 rounded-lg border flex items-center justify-center transition-all cursor-pointer relative group ${
                 isExtraSidebarOpen
-                  ? 'bg-blue-500/25 border-blue-400 text-blue-200 shadow-[0_0_16px_rgba(59,130,246,0.3)]'
-                  : 'bg-white/[0.03] hover:bg-blue-500/15 border-white/[0.08] hover:border-blue-500/40 text-slate-300 hover:text-blue-300'
+                  ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
+                  : 'border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
               }`}
-              title="Extra Tools & Utilities (Backups, Roadmap, Grading Scale, Reset)"
+              title="Extra Tools & Utilities"
             >
-              <Menu className="h-4.5 w-4.5 group-hover:scale-110 transition-transform" />
-              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-blue-400" />
+              <Menu className="h-4 w-4 group-hover:scale-105 transition-transform" />
+              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
             </button>
           </nav>
         </div>
 
-        {/* Bottom: Cloud Sync / Profile at the very bottom */}
-        <div className="flex flex-col items-center gap-3 w-full mt-auto">
+        {/* Bottom: Theme Toggle & Cloud Sync */}
+        <div className="flex flex-col items-center gap-2 w-full mt-auto">
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] flex items-center justify-center transition-all cursor-pointer"
+            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+
           {/* Cloud Sync / Profile Button */}
           <button
             type="button"
@@ -3680,16 +3978,16 @@ export default function Home() {
               setGatekeeperError(null);
               setShowCloudModal(true);
             }}
-            className="h-10 w-10 rounded-2xl bg-white/[0.03] hover:bg-blue-500/15 border border-white/[0.08] hover:border-blue-500/40 flex items-center justify-center transition-all cursor-pointer relative group"
+            className="h-9 w-9 rounded-lg border border-transparent hover:border-[#ebebeb] dark:hover:border-[#262626] hover:bg-[#f5f5f5] dark:hover:bg-[#141414] flex items-center justify-center transition-all cursor-pointer relative"
             title={cloudUser ? `Google Drive Synced • ${cloudUser.email}` : "Sign in with G-Suite"}
           >
             {cloudUser?.picture ? (
-              <img src={cloudUser.picture} alt="Profile" className="h-6 w-6 rounded-full object-cover" />
+              <img src={cloudUser.picture} alt="Profile" className="h-6 w-6 rounded-full object-cover border border-[#ebebeb] dark:border-[#262626]" />
             ) : (
-              <Cloud className={`h-4.5 w-4.5 ${cloudUser ? 'text-blue-400' : 'text-slate-400 group-hover:text-blue-400'}`} />
+              <Cloud className={`h-4 w-4 ${cloudUser ? 'text-[#0070f3]' : 'text-[#888888]'}`} />
             )}
             {cloudUser && (
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-blue-400" />
+              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-[#0070f3]" />
             )}
           </button>
         </div>
@@ -3701,58 +3999,58 @@ export default function Home() {
           {/* Backdrop on small screens */}
           <div 
             onClick={() => setIsExtraSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
           />
 
-          <div className="fixed top-0 left-0 lg:left-20 h-screen w-80 sm:w-96 bg-[#070913]/98 border-r border-blue-500/20 backdrop-blur-2xl z-50 p-6 flex flex-col justify-between shadow-2xl animate-in slide-in-from-left duration-200 overflow-y-auto custom-scrollbar">
+          <div className="fixed top-0 left-0 lg:left-16 h-screen w-80 sm:w-88 bg-white dark:bg-[#0a0a0a] border-r border-[#ebebeb] dark:border-[#262626] z-50 p-6 flex flex-col justify-between shadow-vercel-modal animate-in slide-in-from-left duration-200 overflow-y-auto">
             <div className="space-y-6">
               {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#262626] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                    <Menu className="h-4.5 w-4.5" />
+                  <div className="h-8 w-8 rounded-md bg-[#f5f5f5] dark:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+                    <Menu className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-white">Extra Tools &amp; Data</h3>
-                    <p className="text-[11px] text-slate-400">Backups, snapshots &amp; utilities</p>
+                    <h3 className="font-semibold text-sm tracking-tight text-[#171717] dark:text-[#ededed]">Tools &amp; Utilities</h3>
+                    <p className="text-[11px] text-[#888888]">Curriculum utilities &amp; backups</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsExtraSidebarOpen(false)}
-                  className="h-8 w-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition"
+                  className="h-7 w-7 rounded-md bg-white dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center cursor-pointer transition"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
 
               {/* Backup & Progress Actions */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 block mb-1">Data &amp; Backups</span>
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888] px-1 block mb-1">Data &amp; Backups</span>
                 
                 {/* Export JSON */}
                 <button
                   type="button"
                   onClick={handleExportBackup}
-                  className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center gap-3 transition cursor-pointer text-left group"
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
                 >
-                  <div className="h-8 w-8 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                     <Download className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">Export JSON Backup</p>
-                    <p className="text-[10px] text-slate-400">Save curriculum to local file</p>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Export JSON Backup</p>
+                    <p className="text-[11px] text-[#888888]">Save curriculum state locally</p>
                   </div>
                 </button>
 
                 {/* Restore JSON */}
-                <label className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center gap-3 transition cursor-pointer text-left group">
-                  <div className="h-8 w-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                <label className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group">
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                     <Upload className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">Restore JSON Backup</p>
-                    <p className="text-[10px] text-slate-400">Load from .json file</p>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Restore JSON Backup</p>
+                    <p className="text-[11px] text-[#888888]">Load from .json file</p>
                   </div>
                   <input
                     type="file"
@@ -3772,21 +4070,21 @@ export default function Home() {
                     setShowGradeSheetModal(true);
                     setIsExtraSidebarOpen(false);
                   }}
-                  className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center gap-3 transition cursor-pointer text-left group"
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
                 >
-                  <div className="h-8 w-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                     <Camera className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">Snapshot Progress PNG</p>
-                    <p className="text-[10px] text-slate-400">Generate high-res grade sheet</p>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Snapshot Progress PNG</p>
+                    <p className="text-[11px] text-[#888888]">High-resolution summary card</p>
                   </div>
                 </button>
               </div>
 
-              {/* Curriculum Tools */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 block mb-1">Academic Utilities</span>
+              {/* Academic Utilities */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888] px-1 block mb-1">Academic Utilities</span>
 
                 {/* Feeling Lost Roadmap */}
                 <button
@@ -3795,14 +4093,14 @@ export default function Home() {
                     setShowRoadmapModal(true);
                     setIsExtraSidebarOpen(false);
                   }}
-                  className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center gap-3 transition cursor-pointer text-left group"
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
                 >
-                  <div className="h-8 w-8 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                     <HelpCircle className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">Feeling Lost? Roadmap</p>
-                    <p className="text-[10px] text-slate-400">Official CSE curriculum guide</p>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">Curriculum Roadmap</p>
+                    <p className="text-[11px] text-[#888888]">Interactive CSE flowchart</p>
                   </div>
                 </button>
 
@@ -3811,18 +4109,18 @@ export default function Home() {
                   href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-indigo-500/10 border border-white/[0.08] hover:border-indigo-500/30 flex items-center justify-between gap-3 transition cursor-pointer text-left group"
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                       <FileText className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-100 group-hover:text-indigo-300 transition-colors truncate">Sample OBE Curriculum (Version 2023)</p>
-                      <p className="text-[10px] text-slate-400 truncate">Official Google Doc syllabus</p>
+                      <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors truncate">Sample OBE Curriculum (2023)</p>
+                      <p className="text-[11px] text-[#888888] truncate">Official Google Doc syllabus</p>
                     </div>
                   </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-300 transition-colors shrink-0" />
+                  <ExternalLink className="h-3.5 w-3.5 text-[#888888] group-hover:text-[#0070f3] transition-colors shrink-0" />
                 </a>
 
                 {/* Grading System Scale */}
@@ -3832,33 +4130,31 @@ export default function Home() {
                     setShowGradingSystemModal(true);
                     setIsExtraSidebarOpen(false);
                   }}
-                  className="w-full p-3 rounded-2xl bg-white/[0.03] hover:bg-blue-500/10 border border-white/[0.08] hover:border-blue-500/30 flex items-center gap-3 transition cursor-pointer text-left group"
+                  className="w-full p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-[#f5f5f5] dark:hover:bg-[#171717] border border-[#ebebeb] dark:border-[#262626] flex items-center gap-3 transition cursor-pointer text-left shadow-vercel-subtle group"
                 >
-                  <div className="h-8 w-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <div className="h-8 w-8 rounded-md bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
                     <Award className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">BRACU Grading Scale</p>
-                    <p className="text-[10px] text-slate-400">View grade points &amp; marks table</p>
+                    <p className="text-xs font-medium text-[#171717] dark:text-[#ededed] group-hover:text-[#0070f3] transition-colors">BRACU Grading Scale</p>
+                    <p className="text-[11px] text-[#888888]">Grade points &amp; marks range</p>
                   </div>
                 </button>
               </div>
             </div>
 
             {/* Drawer Bottom: Reset Plan */}
-            <div className="pt-4 border-t border-white/[0.08]">
+            <div className="pt-4 border-t border-[#ebebeb] dark:border-[#262626]">
               <button
                 type="button"
                 onClick={() => {
                   setShowResetConfirm(true);
                   setIsExtraSidebarOpen(false);
                 }}
-                className="w-full p-3 rounded-2xl bg-rose-950/20 hover:bg-rose-950/40 border border-rose-900/30 hover:border-rose-700/50 text-rose-400 flex items-center gap-3 transition cursor-pointer"
+                className="w-full p-2.5 rounded-lg bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 text-[#ee0000] flex items-center justify-center gap-2 transition cursor-pointer"
               >
-                <RotateCcw className="h-4 w-4 shrink-0" />
-                <div className="text-left">
-                  <p className="text-xs font-bold">Reset Plan to Default</p>
-                </div>
+                <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-xs font-medium">Reset Plan to Default</span>
               </button>
             </div>
           </div>
@@ -3866,20 +4162,30 @@ export default function Home() {
       )}
 
       {/* 3. Mobile Header (< 1024px) */}
-      <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-[#060814]/90 border-b border-white/[0.08] sticky top-0 z-40 backdrop-blur-xl">
+      <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-white/80 dark:bg-black/80 border-b border-[#ebebeb] dark:border-[#262626] sticky top-0 z-40 backdrop-blur-md">
         <div 
           onClick={() => setShowDashboard(false)}
-          className="flex items-center gap-2.5 cursor-pointer"
+          className="flex items-center gap-2 cursor-pointer"
         >
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-500 border border-indigo-400/30 flex items-center justify-center text-white shadow-[0_4px_12px_rgba(99,102,241,0.35)]">
-            <svg className="h-4.5 w-4.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+          <div className="h-7 w-7 rounded-md bg-[#171717] dark:bg-white text-white dark:text-black flex items-center justify-center shadow-vercel-subtle">
+            <svg className="h-4 w-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
             </svg>
           </div>
-          <span className="font-black text-sm tracking-tight text-white">Flow136</span>
+          <span className="font-semibold text-sm tracking-tight text-[#171717] dark:text-white">Route136</span>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Theme Toggle Button Mobile */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="h-8 w-8 rounded-md bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center cursor-pointer transition"
+            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
+
           {/* Profile / Cloud Button */}
           <button
             type="button"
@@ -3887,12 +4193,12 @@ export default function Home() {
               setGatekeeperError(null);
               setShowCloudModal(true);
             }}
-            className="h-9 w-9 rounded-xl bg-white/[0.04] border border-white/[0.1] flex items-center justify-center cursor-pointer hover:bg-white/[0.08] transition"
+            className="h-8 w-8 rounded-md bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center cursor-pointer hover:bg-[#ebebeb] dark:hover:bg-[#1c1c1c] transition"
           >
             {cloudUser?.picture ? (
               <img src={cloudUser.picture} alt="" className="h-5 w-5 rounded-full object-cover" />
             ) : (
-              <Cloud className="h-4 w-4 text-blue-400" />
+              <Cloud className="h-3.5 w-3.5 text-[#0070f3]" />
             )}
           </button>
         </div>
@@ -3901,29 +4207,23 @@ export default function Home() {
       {/* 4. Main Body Container (either Onboarding Wizard or Bento Dashboard) */}
       {!isOnboarded ? (
         /* Onboarding Wizard Modal overlay if not onboarded */
-        <div className="flex-1 flex items-center justify-center p-4 md:p-6 bg-[#030304] bg-gradient-to-b from-[#030304] via-[#08080d] to-[#030304]">
-          <div className="w-full max-w-xl mx-auto bg-[#08080d]/95 border border-slate-700/80 rounded-3xl shadow-2xl relative overflow-hidden p-6 sm:p-8 space-y-6">
+        <div className="flex-1 flex items-center justify-center p-4 md:p-6 bg-[#fafafa] dark:bg-[#000000] transition-colors">
+          <div className="w-full max-w-lg mx-auto bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl shadow-vercel-modal relative overflow-hidden p-6 sm:p-8 space-y-6 text-[#171717] dark:text-[#ededed]">
             
-            {/* Ambient glows inside card */}
-            <div className="absolute top-[-20%] left-[-20%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-20%] w-[50%] h-[50%] rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
-
             {/* Header & Step Indicators */}
             <div className="relative z-10 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-9 w-9 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                    <svg className="h-4.5 w-4.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                    </svg>
+                  <div className="h-8 w-8 rounded-lg border border-[#ebebeb] dark:border-[#262626] bg-[#f5f5f5] dark:bg-[#141414] flex items-center justify-center text-[#171717] dark:text-white">
+                    <BookOpen className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Curriculum Setup</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[#888888]">Curriculum Setup</h3>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0e0e14] border border-slate-800">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Step</span>
-                  <span className="text-xs font-black text-indigo-400">{wizardStep}/3</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626]">
+                  <span className="text-[10px] font-mono text-[#888888] uppercase">Step</span>
+                  <span className="text-xs font-mono font-semibold text-[#171717] dark:text-white">{wizardStep}/3</span>
                 </div>
               </div>
 
@@ -3932,10 +4232,10 @@ export default function Home() {
                 {[1, 2, 3].map(s => (
                   <div
                     key={s}
-                    className={`h-2 flex-1 rounded-full transition-all duration-500 ${
+                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
                       s <= wizardStep 
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 shadow-sm shadow-indigo-500/30' 
-                        : 'bg-[#0e0e14] border border-slate-800/80'
+                        ? 'bg-[#171717] dark:bg-white' 
+                        : 'bg-[#ebebeb] dark:bg-[#262626]'
                     }`}
                   />
                 ))}
@@ -3946,15 +4246,15 @@ export default function Home() {
             {wizardStep === 1 && (
               <div className="space-y-6 relative z-10">
                 <div>
-                  <h2 className="text-xl font-black tracking-tight text-white">1st Semester Starting State</h2>
-                  <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">1st Semester Starting State</h2>
+                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
                     How did you start your 1st Semester at BRACU? Choose your starting entry point to map your calculus and English pathways.
                   </p>
                 </div>
 
                 <div className="space-y-4">
                   {/* Pathway Buttons */}
-                  <div className="grid grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => setOnboardingData({
                         ...onboardingData,
@@ -3962,18 +4262,18 @@ export default function Home() {
                         foundationOption: onboardingData.foundationOption || 'opt1',
                         creditOption: null
                       })}
-                      className={`p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between h-28 cursor-pointer ${
+                      className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between h-28 cursor-pointer ${
                         onboardingData.pathway === 'foundation'
-                          ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                          : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                       }`}
                     >
-                      <div className="h-8 w-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                        <BookOpen className="h-4.5 w-4.5" />
+                      <div className="h-7 w-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+                        <BookOpen className="h-3.5 w-3.5" />
                       </div>
                       <div>
-                        <p className="text-xs text-white font-black">Pathway A</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Non-Credit Foundation</p>
+                        <p className="text-xs font-semibold text-[#171717] dark:text-white">Pathway A</p>
+                        <p className="text-[11px] text-[#888888] mt-0.5">Non-Credit Foundation</p>
                       </div>
                     </button>
 
@@ -3984,31 +4284,31 @@ export default function Home() {
                         creditOption: onboardingData.creditOption || 'opt1',
                         foundationOption: null
                       })}
-                      className={`p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between h-28 cursor-pointer ${
+                      className={`p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between h-28 cursor-pointer ${
                         onboardingData.pathway === 'credit'
-                          ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                          : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                       }`}
                     >
-                      <div className="h-8 w-8 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                        <Award className="h-4.5 w-4.5" />
+                      <div className="h-7 w-7 rounded-md bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white">
+                        <Award className="h-3.5 w-3.5" />
                       </div>
                       <div>
-                        <p className="text-xs text-white font-black">Pathway B</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Direct Credit Courses</p>
+                        <p className="text-xs font-semibold text-[#171717] dark:text-white">Pathway B</p>
+                        <p className="text-[11px] text-[#888888] mt-0.5">Direct Credit Courses</p>
                       </div>
                     </button>
                   </div>
 
                   {/* Sub-options for Pathway A */}
                   {onboardingData.pathway === 'foundation' && (
-                    <div className="space-y-3 pt-2">
-                      <label className="block text-xs font-bold tracking-wider text-slate-400 mt-4 mb-2">Select all required non-credit courses:</label>
+                    <div className="space-y-2.5 pt-2">
+                      <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Select required non-credit courses:</label>
                       
-                      <label className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
                         onboardingData.remedialEng091Checked
-                          ? 'bg-gradient-to-br from-indigo-900/25 to-blue-900/15 border-indigo-500/80 text-indigo-300 font-bold shadow-md shadow-indigo-500/10'
-                          : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
+                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
                       }`}>
                         <input
                           type="checkbox"
@@ -4016,25 +4316,25 @@ export default function Home() {
                           onChange={(e) => setOnboardingData({ ...onboardingData, remedialEng091Checked: e.target.checked })}
                           className="sr-only"
                         />
-                        <div className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 shrink-0 mt-0.5 ${
+                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
                           onboardingData.remedialEng091Checked
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(99,102,241,0.5)]'
-                            : 'border-white/20 bg-white/[0.04]'
+                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
                         }`}>
                           {onboardingData.remedialEng091Checked && (
-                            <Check className="h-3 w-3 text-white stroke-[3]" />
+                            <Check className="h-3 w-3 stroke-[3]" />
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-100">ENG091 ({COURSES.find(c => c.code === "ENG091")?.title})</p>
-                          <p className="text-xs text-slate-400 mt-0.5 font-medium">Required for students needing basic English grounding</p>
+                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">ENG091 ({COURSES.find(c => c.code === "ENG091")?.title})</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Required for foundation English grounding</p>
                         </div>
                       </label>
 
-                      <label className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
                         onboardingData.remedialMat091Checked
-                          ? 'bg-gradient-to-br from-indigo-900/25 to-blue-900/15 border-indigo-500/80 text-indigo-300 font-bold shadow-md shadow-indigo-500/10'
-                          : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
+                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
                       }`}>
                         <input
                           type="checkbox"
@@ -4042,25 +4342,25 @@ export default function Home() {
                           onChange={(e) => setOnboardingData({ ...onboardingData, remedialMat091Checked: e.target.checked })}
                           className="sr-only"
                         />
-                        <div className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 shrink-0 mt-0.5 ${
+                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
                           onboardingData.remedialMat091Checked
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(99,102,241,0.5)]'
-                            : 'border-white/20 bg-white/[0.04]'
+                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
                         }`}>
                           {onboardingData.remedialMat091Checked && (
-                            <Check className="h-3 w-3 text-white stroke-[3]" />
+                            <Check className="h-3 w-3 stroke-[3]" />
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-100">MAT091 ({COURSES.find(c => c.code === "MAT091")?.title})</p>
-                          <p className="text-xs text-slate-400 mt-0.5 font-medium">Basic remedial pre-calculus algebra</p>
+                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">MAT091 ({COURSES.find(c => c.code === "MAT091")?.title})</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Basic remedial pre-calculus algebra</p>
                         </div>
                       </label>
 
-                      <label className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                      <label className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all cursor-pointer ${
                         onboardingData.remedialMat092Checked
-                          ? 'bg-gradient-to-br from-indigo-900/25 to-blue-900/15 border-indigo-500/80 text-indigo-300 font-bold shadow-md shadow-indigo-500/10'
-                          : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                          ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white shadow-vercel-subtle'
+                          : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] hover:border-[#888888]'
                       }`}>
                         <input
                           type="checkbox"
@@ -4068,18 +4368,18 @@ export default function Home() {
                           onChange={(e) => setOnboardingData({ ...onboardingData, remedialMat092Checked: e.target.checked })}
                           className="sr-only"
                         />
-                        <div className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 shrink-0 mt-0.5 ${
+                        <div className={`h-4 w-4 rounded border flex items-center justify-center transition-all shrink-0 mt-0.5 ${
                           onboardingData.remedialMat092Checked
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(99,102,241,0.5)]'
-                            : 'border-white/20 bg-white/[0.04]'
+                            ? 'bg-[#171717] dark:bg-white border-[#171717] dark:border-white text-white dark:text-black'
+                            : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#111111]'
                         }`}>
                           {onboardingData.remedialMat092Checked && (
-                            <Check className="h-3 w-3 text-white stroke-[3]" />
+                            <Check className="h-3 w-3 stroke-[3]" />
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-100">MAT092 ({COURSES.find(c => c.code === "MAT092")?.title})</p>
-                          <p className="text-xs text-slate-400 mt-0.5 font-medium">Intermediate remedial algebra prior to MAT110 Calculus</p>
+                          <p className="text-xs font-medium text-[#171717] dark:text-[#ededed]">MAT092 ({COURSES.find(c => c.code === "MAT092")?.title})</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Intermediate remedial algebra prior to MAT110 Calculus</p>
                         </div>
                       </label>
                     </div>
@@ -4087,8 +4387,8 @@ export default function Home() {
 
                   {/* Sub-options for Pathway B */}
                   {onboardingData.pathway === 'credit' && (
-                    <div className="space-y-3 pt-2">
-                      <label className="block text-xs font-bold tracking-wider text-slate-400 mt-4 mb-2">Select starting English course:</label>
+                    <div className="space-y-2.5 pt-2">
+                      <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Select starting English course:</label>
                       
                       <button
                         onClick={() => {
@@ -4101,17 +4401,17 @@ export default function Home() {
                             engStatusPriorToRS: nextPriorStatus
                           });
                         }}
-                        className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                        className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                           onboardingData.creditOption === 'opt1'
-                            ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                            : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                            ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                            : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                         }`}
                       >
                         <div>
-                          <p className="font-bold text-white text-sm">Option 1: Started with ENG101</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Assigns ENG101 ({COURSES.find(c => c.code === "ENG101")?.title}) to Semester 1</p>
+                          <p className="font-semibold text-xs text-[#171717] dark:text-white">Option 1: Started with ENG101</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Assigns ENG101 to Semester 1</p>
                         </div>
-                        {onboardingData.creditOption === 'opt1' && <Check className="h-5 w-5 text-indigo-400" />}
+                        {onboardingData.creditOption === 'opt1' && <Check className="h-4 w-4 text-[#0070f3]" />}
                       </button>
 
                       <button
@@ -4125,17 +4425,17 @@ export default function Home() {
                             engStatusPriorToRS: nextPriorStatus
                           });
                         }}
-                        className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                        className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                           onboardingData.creditOption === 'opt2'
-                            ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                            : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                            ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                            : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                         }`}
                       >
                         <div>
-                          <p className="font-bold text-white text-sm">Option 2: Started with ENG102</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Assigns ENG102 ({COURSES.find(c => c.code === "ENG102")?.title}) to Semester 1</p>
+                          <p className="font-semibold text-xs text-[#171717] dark:text-white">Option 2: Started with ENG102</p>
+                          <p className="text-[11px] text-[#888888] mt-0.5">Assigns ENG102 to Semester 1</p>
                         </div>
-                        {onboardingData.creditOption === 'opt2' && <Check className="h-5 w-5 text-indigo-400" />}
+                        {onboardingData.creditOption === 'opt2' && <Check className="h-4 w-4 text-[#0070f3]" />}
                       </button>
                     </div>
                   )}
@@ -4145,7 +4445,7 @@ export default function Home() {
                   <button
                     onClick={() => setWizardStep(2)}
                     disabled={!onboardingData.pathway}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-500/25 transition duration-200 cursor-pointer text-xs uppercase tracking-wider active:scale-[0.98]"
+                    className="px-5 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
                   >
                     Continue
                   </button>
@@ -4157,25 +4457,25 @@ export default function Home() {
             {wizardStep === 2 && (
               <div className="space-y-6 relative z-10">
                 <div>
-                  <h2 className="text-xl font-black tracking-tight text-white">Intake &amp; RS Relation Information</h2>
-                  <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">Intake &amp; RS Placement</h2>
+                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
                     Set up your starting intake and Residential Semester (RS) details to automatically organize your curriculum pathway.
                   </p>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {/* Select RS Term */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold tracking-wider text-slate-400">When will you attend RS?</label>
-                    <div className="grid grid-cols-3 gap-2.5">
+                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">When will you attend RS?</label>
+                    <div className="grid grid-cols-3 gap-2">
                       {(["3rd Semester", "4th Semester", "5th Semester"] as const).map(term => (
                         <button
                           key={term}
                           onClick={() => setOnboardingData({ ...onboardingData, rsTerm: term })}
-                          className={`p-3.5 rounded-2xl border text-xs font-bold text-center transition-all duration-300 cursor-pointer ${
+                          className={`p-3 rounded-lg border text-xs font-medium text-center transition-all cursor-pointer ${
                             onboardingData.rsTerm === term
-                              ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                              : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                              ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                              : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                           }`}
                         >
                           {term}
@@ -4186,19 +4486,19 @@ export default function Home() {
 
                   {/* Select Starting Intake */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold tracking-wider text-slate-400">Starting intake:</label>
+                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">Starting intake:</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
                         <select
                           value={onboardingData.startingTerm}
                           onChange={(e) => setOnboardingData({ ...onboardingData, startingTerm: e.target.value as any })}
-                          className="w-full appearance-none bg-[#0e0e14] border border-slate-800/80 text-xs pl-3.5 pr-9 py-2.5 rounded-2xl text-slate-100 outline-none focus:border-indigo-500 transition cursor-pointer font-semibold"
+                          className="w-full appearance-none bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] text-xs pl-3.5 pr-8 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#171717] dark:focus:border-white transition cursor-pointer font-medium"
                         >
                           <option value="Spring">Spring</option>
                           <option value="Summer">Summer</option>
                           <option value="Fall">Fall</option>
                         </select>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
+                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
                           <ChevronDown className="h-3.5 w-3.5" />
                         </div>
                       </div>
@@ -4207,13 +4507,13 @@ export default function Home() {
                         <select
                           value={onboardingData.startingYear}
                           onChange={(e) => setOnboardingData({ ...onboardingData, startingYear: parseInt(e.target.value) })}
-                          className="w-full appearance-none bg-[#0e0e14] border border-slate-800/80 text-xs pl-3.5 pr-9 py-2.5 rounded-2xl text-slate-100 outline-none focus:border-indigo-500 transition cursor-pointer font-semibold"
+                          className="w-full appearance-none bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] text-xs pl-3.5 pr-8 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#171717] dark:focus:border-white transition cursor-pointer font-medium"
                         >
                           {Array.from({ length: 11 }, (_, i) => 2020 + i).map(year => (
                             <option key={year} value={year}>{year}</option>
                           ))}
                         </select>
-                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
+                        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
                           <ChevronDown className="h-3.5 w-3.5" />
                         </div>
                       </div>
@@ -4221,89 +4521,88 @@ export default function Home() {
                   </div>
 
                   {/* Select Stream 1 Status Prior to RS */}
-                  <div className="space-y-2 pt-2">
-                    <label className="block text-xs font-bold tracking-wider text-slate-400">
+                  <div className="space-y-2 pt-1">
+                    <label className="block text-[11px] font-mono text-[#888888] uppercase tracking-wider">
                       Stream 1 Status Prior to RS:
                     </label>
-                    <div className="space-y-2.5">
-                      
+                    <div className="space-y-2">
                       {onboardingData.creditOption === 'opt2' ? (
                         <>
                           <button
                             onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseA' })}
-                            className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                               onboardingData.engStatusPriorToRS === 'caseA'
-                                ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                                : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                             }`}
                           >
                             <div>
-                              <p className="text-white font-bold text-xs">Have not completed ENG102 before RS (will take ENG102 during RS)</p>
-                              <p className="text-[10px] text-indigo-400 mt-0.5 font-medium">RS card will auto-assign: ENG102 as your 4th course</p>
+                              <p className="font-medium text-xs text-[#171717] dark:text-white">Have not completed ENG102 before RS (taking ENG102 at RS)</p>
+                              <p className="text-[11px] text-[#0070f3] mt-0.5">RS card will assign: ENG102 as 4th course</p>
                             </div>
-                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-5 w-5 text-indigo-400 shrink-0" />}
+                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
                           </button>
 
                           <button
                             onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseD' })}
-                            className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                               onboardingData.engStatusPriorToRS === 'caseD'
-                                ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                                : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                             }`}
                           >
                             <div>
-                              <p className="text-white font-bold text-xs">Completed ENG102 before RS</p>
-                              <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">RS card will auto-assign: BU201 as your 4th course</p>
+                              <p className="font-medium text-xs text-[#171717] dark:text-white">Completed ENG102 before RS</p>
+                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
                             </div>
-                            {onboardingData.engStatusPriorToRS === 'caseD' && <Check className="h-5 w-5 text-indigo-400 shrink-0" />}
+                            {onboardingData.engStatusPriorToRS === 'caseD' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseA' })}
-                            className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                               onboardingData.engStatusPriorToRS === 'caseA'
-                                ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                                : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                             }`}
                           >
                             <div>
-                              <p className="text-white font-bold text-xs">Passed ENG101, but NOT ENG102 before RS</p>
-                              <p className="text-[10px] text-indigo-400 mt-0.5 font-medium">RS card will auto-assign: ENG102 as your 4th course</p>
+                              <p className="font-medium text-xs text-[#171717] dark:text-white">Passed ENG101, but NOT ENG102 before RS</p>
+                              <p className="text-[11px] text-[#0070f3] mt-0.5">RS card will assign: ENG102 as 4th course</p>
                             </div>
-                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-5 w-5 text-indigo-400 shrink-0" />}
+                            {onboardingData.engStatusPriorToRS === 'caseA' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
                           </button>
 
                           <button
                             onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseB' })}
-                            className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                               onboardingData.engStatusPriorToRS === 'caseB'
-                                ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                                : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                             }`}
                           >
                             <div>
-                              <p className="text-white font-bold text-xs">Passed ENG101 and ENG102 before RS</p>
-                              <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">RS card will auto-assign: BU201 as your 4th course</p>
+                              <p className="font-medium text-xs text-[#171717] dark:text-white">Passed ENG101 and ENG102 before RS</p>
+                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
                             </div>
-                            {onboardingData.engStatusPriorToRS === 'caseB' && <Check className="h-5 w-5 text-indigo-400 shrink-0" />}
+                            {onboardingData.engStatusPriorToRS === 'caseB' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
                           </button>
 
                           <button
                             onClick={() => setOnboardingData({ ...onboardingData, engStatusPriorToRS: 'caseC' })}
-                            className={`w-full p-4 rounded-2xl border text-left text-xs transition-all duration-300 flex items-center justify-between cursor-pointer ${
+                            className={`w-full p-3.5 rounded-lg border text-left text-xs transition-all flex items-center justify-between cursor-pointer ${
                               onboardingData.engStatusPriorToRS === 'caseC'
-                                ? 'bg-gradient-to-br from-indigo-900/30 to-blue-900/20 border-indigo-500 text-indigo-300 font-bold shadow-md shadow-indigo-500/15'
-                                : 'bg-[#0e0e14]/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-100 hover:bg-[#121218]/70'
+                                ? 'bg-[#f5f5f5] dark:bg-[#141414] border-[#171717] dark:border-white text-[#171717] dark:text-white shadow-vercel-subtle'
+                                : 'bg-white dark:bg-[#0a0a0a] border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:border-[#888888]'
                             }`}
                           >
                             <div>
-                              <p className="text-white font-bold text-xs">Failed ENG101 before RS</p>
-                              <p className="text-[10px] text-emerald-400 mt-0.5 font-medium">RS card will auto-assign: BU201 as your 4th course</p>
+                              <p className="font-medium text-xs text-[#171717] dark:text-white">Failed ENG101 before RS</p>
+                              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">RS card will assign: BU201 as 4th course</p>
                             </div>
-                            {onboardingData.engStatusPriorToRS === 'caseC' && <Check className="h-5 w-5 text-indigo-400 shrink-0" />}
+                            {onboardingData.engStatusPriorToRS === 'caseC' && <Check className="h-4 w-4 text-[#0070f3] shrink-0" />}
                           </button>
                         </>
                       )}
@@ -4314,7 +4613,7 @@ export default function Home() {
                 <div className="flex items-center justify-between pt-2">
                   <button
                     onClick={() => setWizardStep(1)}
-                    className="text-slate-400 hover:text-slate-200 text-xs font-bold transition cursor-pointer px-4 py-2 rounded-xl"
+                    className="text-[#888888] hover:text-[#171717] dark:hover:text-white text-xs font-medium transition cursor-pointer px-4 py-2 rounded-full border border-[#ebebeb] dark:border-[#262626]"
                   >
                     Back
                   </button>
@@ -4325,7 +4624,7 @@ export default function Home() {
                       }
                     }}
                     disabled={!onboardingData.engStatusPriorToRS}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-500/25 transition duration-200 cursor-pointer text-xs uppercase tracking-wider active:scale-[0.98]"
+                    className="px-5 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
                   >
                     Next Step
                   </button>
@@ -4337,23 +4636,23 @@ export default function Home() {
             {wizardStep === 3 && (
               <div className="space-y-6 relative z-10">
                 <div>
-                  <h2 className="text-xl font-black tracking-tight text-white">Generate Your Study Plan</h2>
-                  <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
-                    Review your generated curriculum layout summary:
+                  <h2 className="text-xl font-semibold tracking-tight text-[#171717] dark:text-white">Generate Study Plan</h2>
+                  <p className="text-[#888888] text-xs mt-1.5 leading-relaxed">
+                    Review your curriculum configuration before generating your custom degree plan:
                   </p>
                 </div>
 
-                <div className="bg-[#050508] border border-slate-800/80 p-5 rounded-2xl space-y-1 text-xs shadow-inner">
-                  <div className="flex justify-between items-center py-2.5 border-b border-slate-800/60 last:border-0">
-                    <span className="text-slate-400 font-medium">Starting Pathway:</span>
-                    <span className="text-right text-xs font-bold text-slate-200 break-words max-w-[65%] capitalize">
+                <div className="bg-[#f5f5f5] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-xl space-y-1 text-xs">
+                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
+                    <span className="text-[#888888] font-medium">Starting Pathway</span>
+                    <span className="text-right text-xs font-medium text-[#171717] dark:text-white capitalize">
                       {onboardingData.pathway === 'foundation' ? "Non-Credit Foundation" : "Direct Credit Course"}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2.5 border-b border-slate-800/60 last:border-0">
-                    <span className="text-slate-400 font-medium">1st Semester Course:</span>
-                    <span className="text-right text-xs font-bold text-indigo-300 break-words max-w-[65%]">
+                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
+                    <span className="text-[#888888] font-medium">1st Semester Course</span>
+                    <span className="text-right text-xs font-mono font-medium text-[#0070f3]">
                       {onboardingData.pathway === 'foundation' 
                         ? ([
                             onboardingData.remedialEng091Checked ? "ENG091" : null,
@@ -4365,16 +4664,16 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2.5 border-b border-slate-800/60 last:border-0">
-                    <span className="text-slate-400 font-medium">RS Semester Card:</span>
-                    <span className="text-right text-xs font-bold text-emerald-400 break-words max-w-[65%]">
+                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
+                    <span className="text-[#888888] font-medium">RS Semester Card</span>
+                    <span className="text-right text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400">
                       {onboardingData.rsTerm}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center py-2.5 border-b border-slate-800/60 last:border-0">
-                    <span className="text-slate-400 font-medium">RS Course Population:</span>
-                    <span className="text-right text-xs font-bold text-slate-200 break-words max-w-[65%]">
+                  <div className="flex justify-between items-center py-2 border-b border-[#ebebeb] dark:border-[#262626] last:border-0">
+                    <span className="text-[#888888] font-medium">RS Course Population</span>
+                    <span className="text-right text-xs font-mono text-[#171717] dark:text-white">
                       {onboardingData.engStatusPriorToRS === 'caseA' ? "EMB101 + HUM103 + BNG103 + ENG102" : "EMB101 + HUM103 + BNG103 + BU201"}
                     </span>
                   </div>
@@ -4383,7 +4682,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => setWizardStep(2)}
-                    className="text-slate-400 hover:text-slate-200 text-xs font-bold transition cursor-pointer px-4 py-2 rounded-xl"
+                    className="text-[#888888] hover:text-[#171717] dark:hover:text-white text-xs font-medium transition cursor-pointer px-4 py-2 rounded-full border border-[#ebebeb] dark:border-[#262626]"
                   >
                     Back
                   </button>
@@ -4391,7 +4690,7 @@ export default function Home() {
                     onClick={() => {
                       generateInitialPlan();
                     }}
-                    className="px-7 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold rounded-2xl shadow-lg shadow-indigo-500/25 transition duration-200 cursor-pointer text-xs uppercase tracking-wider active:scale-[0.98]"
+                    className="px-6 py-2.5 bg-[#171717] dark:bg-white text-white dark:text-black font-medium rounded-full hover:bg-black/90 dark:hover:bg-white/90 shadow-vercel-subtle transition duration-150 cursor-pointer text-xs"
                   >
                     Generate Plan
                   </button>
@@ -4403,19 +4702,19 @@ export default function Home() {
       ) : (
         /* Actual App Dashboard in Bento Grid Layout */
         <main className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 overflow-y-auto max-h-screen custom-scrollbar flex flex-col gap-6 pb-24 lg:pb-6">
-          <div className="w-full bg-[#070913]/90 border border-blue-500/20 rounded-[24px] sm:rounded-[36px] p-4 sm:p-6 lg:p-7 shadow-2xl backdrop-blur-xl relative flex flex-col gap-6">
+          <div className="w-full bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-2xl p-4 sm:p-6 lg:p-7 shadow-vercel-card relative flex flex-col gap-6 transition-colors">
             
             {/* Bento Container Top Bar: Mode Toggle, Search, Degree Status & Profile */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-[#ebebeb] dark:border-[#262626] pb-5">
               {/* Mode Toggler Pill */}
-              <div className="bg-[#04050d] border border-blue-500/20 p-1.5 rounded-2xl flex items-center gap-1.5 self-start md:self-auto shadow-inner">
+              <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] p-1 rounded-full flex items-center gap-1 self-start md:self-auto shadow-vercel-subtle">
                 <button
                   type="button"
                   onClick={() => mode !== 'tracker' && handleModeToggle()}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                     mode === 'tracker'
-                      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white dark:bg-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
+                      : 'text-[#888888] hover:text-[#171717] dark:hover:text-white'
                   }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -4424,10 +4723,10 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => mode !== 'gpa' && handleModeToggle()}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                     mode === 'gpa'
-                      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-white dark:bg-[#262626] text-[#171717] dark:text-white shadow-vercel-subtle'
+                      : 'text-[#888888] hover:text-[#171717] dark:hover:text-white'
                   }`}
                 >
                   <TrendingUp className="h-3.5 w-3.5" />
@@ -4437,31 +4736,31 @@ export default function Home() {
 
               {/* Global Search Bar (Center) */}
               <div className="relative flex-1 max-w-md mx-auto w-full">
-                <div className="relative flex items-center bg-[#04050d] border border-blue-500/20 rounded-2xl px-3.5 py-2 shadow-inner focus-within:border-blue-400/50 transition-colors">
-                  <Search className="h-4 w-4 text-blue-400/80 mr-2.5 shrink-0" />
+                <div className="relative flex items-center bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-full px-3.5 py-1.5 shadow-vercel-subtle focus-within:border-[#171717] dark:focus-within:border-white transition-colors">
+                  <Search className="h-3.5 w-3.5 text-[#888888] mr-2 shrink-0" />
                   <input
                     type="text"
                     value={globalSearchQuery}
                     onChange={(e) => setGlobalSearchQuery(e.target.value)}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                    placeholder="Search course code or name (e.g. CSE220, MAT120)..."
-                    className="w-full bg-transparent text-xs text-slate-100 placeholder-slate-500 focus:outline-none font-medium"
+                    placeholder="Search course code or title (e.g. CSE220)..."
+                    className="w-full bg-transparent text-xs text-[#171717] dark:text-[#ededed] placeholder-[#888888] focus:outline-none font-medium"
                   />
                   {globalSearchQuery && (
                     <button
                       type="button"
                       onClick={() => setGlobalSearchQuery('')}
-                      className="text-slate-500 hover:text-slate-300 p-0.5"
+                      className="text-[#888888] hover:text-[#171717] dark:hover:text-white p-0.5"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   )}
                 </div>
 
                 {/* Search Dropdown Results */}
                 {isSearchFocused && globalFilteredCourses.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-[#070913] border border-blue-500/30 rounded-2xl p-2 shadow-2xl z-50 divide-y divide-white/[0.04] max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0a0a0a] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-1.5 shadow-vercel-modal z-50 divide-y divide-[#ebebeb] dark:divide-[#262626] max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
                     {globalFilteredCourses.map(course => (
                       <div
                         key={course.code}
@@ -4478,17 +4777,17 @@ export default function Home() {
                           setGlobalSearchQuery('');
                           setIsSearchFocused(false);
                         }}
-                        className="p-2.5 hover:bg-blue-500/10 rounded-xl flex items-center justify-between cursor-pointer transition group"
+                        className="p-2.5 hover:bg-[#fafafa] dark:hover:bg-[#141414] rounded-lg flex items-center justify-between cursor-pointer transition group"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-extrabold text-xs text-white group-hover:text-blue-300 font-mono">{course.code}</span>
-                            <span className="text-[10px] text-slate-400 bg-white/[0.04] px-1.5 py-0.2 rounded">{course.credits} Cr</span>
+                            <span className="font-semibold text-xs text-[#171717] dark:text-white font-mono group-hover:text-[#0070f3]">{course.code}</span>
+                            <span className="text-[10px] text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-1.5 py-0.5 rounded font-mono">{course.credits} Cr</span>
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{course.title}</p>
+                          <p className="text-[11px] text-[#888888] truncate mt-0.5">{course.title}</p>
                         </div>
-                        <span className="text-[10px] text-blue-400 font-semibold shrink-0 group-hover:underline">
-                          Add to Plan &rarr;
+                        <span className="text-[10px] text-[#0070f3] font-medium shrink-0 group-hover:underline">
+                          Add &rarr;
                         </span>
                       </div>
                     ))}
@@ -4498,10 +4797,10 @@ export default function Home() {
 
               {/* Right Degree Status Badge & Profile */}
               <div className="hidden md:flex items-center gap-3 shrink-0">
-                <div className="bg-[#04050d] border border-blue-500/20 px-3 py-1.5 rounded-2xl flex items-center gap-2">
-                  <BadgeCheck className="h-4 w-4 text-blue-400" />
-                  <span className="text-xs font-extrabold text-slate-200">136 Cr Degree</span>
-                  <span className="text-[11px] font-mono font-bold text-blue-300 bg-blue-500/15 px-2 py-0.5 rounded-lg border border-blue-500/20">
+                <div className="bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] px-3 py-1.5 rounded-full flex items-center gap-2 shadow-vercel-subtle">
+                  <BadgeCheck className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span className="text-xs font-medium text-[#171717] dark:text-[#ededed]">136 Cr Degree</span>
+                  <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-white bg-white dark:bg-[#222222] border border-[#ebebeb] dark:border-[#333333] px-2 py-0.5 rounded-full">
                     {cumulativeStats.completedCredits} Cr
                   </span>
                 </div>
@@ -4512,18 +4811,18 @@ export default function Home() {
             {mode === 'gpa' && (
               <div className="w-full flex flex-col gap-2.5">
                 {cumulativeStats.cgpa > 0 && cumulativeStats.cgpa < 1.50 && (
-                  <div className="flex items-center gap-3 bg-red-950/20 border border-red-900/50 p-3.5 rounded-2xl text-red-400">
+                  <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 p-3.5 rounded-xl text-[#ee0000]">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <p className="text-xs font-medium">
-                      <span className="font-bold">Academic Probation:</span> Your CGPA is below 1.50. You must raise it to 1.50+ next semester to avoid dismissal.
+                      <span className="font-semibold">Academic Probation:</span> Your CGPA is below 1.50. You must raise it to 1.50+ next semester to avoid dismissal.
                     </p>
                   </div>
                 )}
                 {firstSemesterGpa !== null && firstSemesterGpa < 1.00 && (
-                  <div className="flex items-center gap-3 bg-amber-950/20 border border-amber-900/50 p-3.5 rounded-2xl text-amber-400">
+                  <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl text-amber-700 dark:text-amber-400">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <p className="text-xs font-medium">
-                      <span className="font-bold">High Risk:</span> 1st Semester CGPA below 1.00. Immediate academic counseling required.
+                      <span className="font-semibold">High Risk:</span> 1st Semester CGPA below 1.00. Immediate academic counseling required.
                     </p>
                   </div>
                 )}
@@ -4531,7 +4830,7 @@ export default function Home() {
             )}
 
             {backupFileError && (
-              <div className="w-full flex items-center justify-between gap-3 bg-rose-950/30 border border-rose-900/40 p-3.5 rounded-2xl text-rose-400">
+              <div className="w-full flex items-center justify-between gap-3 bg-red-500/10 border border-red-500/20 p-3.5 rounded-xl text-[#ee0000]">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-4 w-4" />
                   <p className="text-xs">{backupFileError}</p>
@@ -4545,28 +4844,28 @@ export default function Home() {
             {/* Top Row: 3 Modules Horizontally Adjacent (Degree Standing, Category Requirements, GenEd Streams) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 items-stretch">
               {/* 1. Degree Standing & Circular Speedometer Gauge */}
-              <div id="degree-standing-section" className="bg-[#070913]/90 border border-blue-500/20 rounded-3xl p-6 shadow-xl relative overflow-hidden backdrop-blur-md flex flex-col justify-between">
+              <div id="degree-standing-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xs font-extrabold text-blue-400 tracking-wider uppercase flex items-center gap-2">
-                    <BadgeCheck className="h-4 w-4" />
+                  <h2 className="text-xs font-semibold text-[#171717] dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <BadgeCheck className="h-4 w-4 text-[#0070f3]" />
                     Degree Standing
                   </h2>
-                  <span className="text-[11px] font-mono font-bold text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono font-medium text-[#171717] dark:text-white bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2.5 py-0.5 rounded-full">
                     {Math.round((cumulativeStats.completedCredits / 136) * 100)}%
                   </span>
                 </div>
 
                 {/* Circular Speedometer Gauge SVG */}
                 <div className="flex flex-col items-center justify-center py-2 relative">
-                  <div className="relative w-40 h-40 flex items-center justify-center">
+                  <div className="relative w-36 h-36 flex items-center justify-center">
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
                       {/* Background Track Circle */}
                       <circle
                         cx="60"
                         cy="60"
                         r="48"
-                        className="stroke-[#04050d]"
-                        strokeWidth="10"
+                        className="stroke-[#f0f0f0] dark:stroke-[#1f1f1f]"
+                        strokeWidth="8"
                         fill="transparent"
                       />
                       {/* Animated Glowing Progress Circle */}
@@ -4574,31 +4873,24 @@ export default function Home() {
                         cx="60"
                         cy="60"
                         r="48"
-                        stroke="url(#degreeGaugeGradientTop)"
-                        strokeWidth="10"
+                        stroke="currentColor"
+                        strokeWidth="8"
                         strokeDasharray={2 * Math.PI * 48}
                         strokeDashoffset={2 * Math.PI * 48 * (1 - Math.min(1, cumulativeStats.completedCredits / 136))}
                         strokeLinecap="round"
                         fill="transparent"
-                        className="transition-all duration-1000 ease-out"
+                        className="text-[#0070f3] transition-all duration-1000 ease-out"
                       />
-                      <defs>
-                        <linearGradient id="degreeGaugeGradientTop" x1="0%" y1="0%" x2="100%" y2="100%">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="50%" stopColor="#6366f1" />
-                          <stop offset="100%" stopColor="#8b5cf6" />
-                        </linearGradient>
-                      </defs>
                     </svg>
                     {/* Center Readout */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-3xl font-black text-white font-mono tracking-tight">
+                      <span className="text-3xl font-semibold text-[#171717] dark:text-white font-mono tracking-tight">
                         {cumulativeStats.completedCredits}
                       </span>
-                      <span className="text-[11px] font-bold text-blue-400 font-mono tracking-wider">
+                      <span className="text-[11px] font-mono text-[#888888] tracking-wider">
                         / 136 Cr
                       </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 font-semibold">
+                      <span className="text-[10px] text-[#888888] mt-0.5">
                         {Math.round((cumulativeStats.completedCredits / 136) * 100)}% Complete
                       </span>
                     </div>
@@ -4606,44 +4898,44 @@ export default function Home() {
                 </div>
 
                 {/* Status Footer */}
-                <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-300 font-medium">
-                    <Target className="h-3.5 w-3.5 text-blue-400" />
+                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-[#888888] font-medium">
+                    <Target className="h-3.5 w-3.5 text-[#0070f3]" />
                     <span>Degree Status</span>
                   </div>
-                  <span className="text-[11px] font-mono font-bold text-blue-300 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20">
+                  <span className="text-[11px] font-mono text-[#171717] dark:text-white bg-[#f5f5f5] dark:bg-[#1a1a1a] px-2.5 py-0.5 rounded-full border border-[#ebebeb] dark:border-[#262626]">
                     {Math.max(0, 136 - cumulativeStats.completedCredits)} Credits to Graduate
                   </span>
                 </div>
               </div>
 
               {/* 2. Category Requirements (Program Core, School Core, Major Electives) */}
-              <div id="category-requirements-section" className="bg-[#070913]/90 border border-blue-500/20 rounded-3xl p-6 shadow-xl relative overflow-hidden backdrop-blur-md flex flex-col justify-between space-y-4">
+              <div id="category-requirements-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-extrabold text-blue-400 tracking-wider uppercase flex items-center gap-2">
-                    <Layers className="h-4 w-4" />
+                  <h2 className="text-xs font-semibold text-[#171717] dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-[#0070f3]" />
                     Category Requirements
                   </h2>
-                  <span className="text-[10px] font-mono font-bold text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded-full">
                     136 Cr
                   </span>
                 </div>
 
-                <div className="space-y-3 flex-1 flex flex-col justify-center">
+                <div className="space-y-2.5 flex-1 flex flex-col justify-center">
                   {/* Program Core */}
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('core')}
-                    className="w-full text-left cursor-pointer bg-blue-950/20 border border-blue-500/20 hover:border-blue-500/40 transition rounded-xl p-3 flex flex-col gap-1.5 group"
+                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
                   >
                     <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-blue-200 font-semibold group-hover:text-blue-100">Program Core</span>
-                      <span className="text-blue-300 font-extrabold text-[11px] font-mono">{curriculumProgress.coreCompleted} / {curriculumProgress.coreTotal} Cr</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">Program Core</span>
+                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.coreCompleted} / {curriculumProgress.coreTotal} Cr</span>
                     </div>
-                    <div className="h-2 w-full bg-[#04050d] border border-blue-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${(curriculumProgress.coreCompleted / curriculumProgress.coreTotal) * 100}%` }}
-                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+                        className="h-full bg-[#0070f3] rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4652,16 +4944,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('schoolCore')}
-                    className="w-full text-left cursor-pointer bg-cyan-950/20 border border-cyan-500/20 hover:border-cyan-500/40 transition rounded-xl p-3 flex flex-col gap-1.5 group"
+                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
                   >
                     <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-cyan-200 font-semibold group-hover:text-cyan-100">School Core (Math/Sci)</span>
-                      <span className="text-cyan-300 font-extrabold text-[11px] font-mono">{curriculumProgress.schoolCoreCompleted} / {curriculumProgress.schoolCoreTotal} Cr</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">School Core (Math/Sci)</span>
+                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.schoolCoreCompleted} / {curriculumProgress.schoolCoreTotal} Cr</span>
                     </div>
-                    <div className="h-2 w-full bg-[#04050d] border border-cyan-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${(curriculumProgress.schoolCoreCompleted / curriculumProgress.schoolCoreTotal) * 100}%` }}
-                        className="h-full bg-gradient-to-r from-cyan-500 to-teal-400 rounded-full transition-all duration-300"
+                        className="h-full bg-cyan-600 dark:bg-cyan-400 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4670,55 +4962,55 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('electives')}
-                    className="w-full text-left cursor-pointer bg-amber-950/20 border border-amber-500/20 hover:border-amber-500/40 transition rounded-xl p-3 flex flex-col gap-1.5 group"
+                    className="w-full text-left cursor-pointer bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] transition rounded-lg p-3 flex flex-col gap-1.5 group shadow-vercel-subtle"
                   >
                     <div className="w-full flex justify-between items-center text-xs">
-                      <span className="text-amber-200 font-semibold group-hover:text-amber-100">Major Electives</span>
-                      <span className="text-amber-300 font-extrabold text-[11px] font-mono">{curriculumProgress.electiveCompleted} / {curriculumProgress.electiveTotal} Cr</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium group-hover:text-[#0070f3] transition-colors">Major Electives</span>
+                      <span className="text-[#171717] dark:text-white font-mono text-[11px]">{curriculumProgress.electiveCompleted} / {curriculumProgress.electiveTotal} Cr</span>
                     </div>
-                    <div className="h-2 w-full bg-[#04050d] border border-amber-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1.5 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${(curriculumProgress.electiveCompleted / curriculumProgress.electiveTotal) * 100}%` }}
-                        className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-300"
+                        className="h-full bg-amber-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
                 </div>
 
                 {/* Category Requirements Footer */}
-                <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
-                  <span>Completed: <strong className="text-blue-300 font-mono">{curriculumProgress.coreCompleted + curriculumProgress.schoolCoreCompleted + curriculumProgress.electiveCompleted}</strong> Cr</span>
-                  <span className="text-[11px] text-slate-400">Click card to inspect</span>
+                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs text-[#888888]">
+                  <span>Completed: <strong className="text-[#171717] dark:text-white font-mono font-medium">{curriculumProgress.coreCompleted + curriculumProgress.schoolCoreCompleted + curriculumProgress.electiveCompleted}</strong> Cr</span>
+                  <span className="text-[11px] text-[#888888]">Click card to inspect</span>
                 </div>
               </div>
 
               {/* 3. GenEd Streams (S1-S5 & Free Choice) */}
-              <div id="gened-streams-section" className="bg-[#070913]/90 border border-blue-500/20 rounded-3xl p-6 shadow-xl relative overflow-hidden backdrop-blur-md flex flex-col justify-between space-y-4">
+              <div id="gened-streams-section" className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col justify-between space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-extrabold text-blue-400 tracking-wider uppercase flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
+                  <h2 className="text-xs font-semibold text-[#171717] dark:text-[#ededed] uppercase tracking-wider flex items-center gap-2">
+                    <Compass className="h-4 w-4 text-[#0070f3]" />
                     GenEd Streams
                   </h2>
-                  <span className="text-[10px] font-mono font-bold text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono text-[#888888] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded-full">
                     39 Cr
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 flex-1 items-center">
+                <div className="grid grid-cols-2 gap-2 flex-1 items-center">
                   {/* S1: Writing Comprehension */}
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('stream1')}
-                    className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/25 hover:border-rose-500/50 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-rose-200 font-semibold truncate group-hover:text-rose-100" title="S1: Writing Comprehension">S1: Writing Comprehension</span>
-                      <span className="text-rose-300 font-mono font-bold text-[11px]">{curriculumProgress.stream1Completed}/{curriculumProgress.stream1Total}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S1: Writing Comprehension">S1: Writing</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream1Completed}/{curriculumProgress.stream1Total}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-rose-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.stream1Completed / curriculumProgress.stream1Total) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full transition-all duration-300"
+                        className="h-full bg-rose-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4727,16 +5019,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('stream2')}
-                    className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/25 hover:border-indigo-500/50 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-indigo-200 font-semibold truncate group-hover:text-indigo-100" title="S2: Math & Natural Sciences">S2: Math &amp; Natural Sciences</span>
-                      <span className="text-indigo-300 font-mono font-bold text-[11px]">{curriculumProgress.stream2Completed}/{curriculumProgress.stream2Total}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S2: Math & Natural Sciences">S2: Math/Sci</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream2Completed}/{curriculumProgress.stream2Total}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-indigo-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.stream2Completed / curriculumProgress.stream2Total) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full transition-all duration-300"
+                        className="h-full bg-blue-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4745,16 +5037,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('stream3')}
-                    className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/25 hover:border-emerald-500/50 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-emerald-200 font-semibold truncate group-hover:text-emerald-100" title="S3: Arts & Humanities">S3: Arts &amp; Humanities</span>
-                      <span className="text-emerald-300 font-mono font-bold text-[11px]">{curriculumProgress.stream3Completed}/{curriculumProgress.stream3Total}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S3: Arts & Humanities">S3: Arts/Hum</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream3Completed}/{curriculumProgress.stream3Total}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-emerald-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.stream3Completed / curriculumProgress.stream3Total) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4763,16 +5055,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('stream4')}
-                    className="p-3 rounded-xl bg-violet-950/20 border border-violet-500/25 hover:border-violet-500/50 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-violet-200 font-semibold truncate group-hover:text-violet-100" title="S4: Social Sciences">S4: Social Sciences</span>
-                      <span className="text-violet-300 font-mono font-bold text-[11px]">{curriculumProgress.stream4Completed}/{curriculumProgress.stream4Total}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S4: Social Sciences">S4: Social Sci</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream4Completed}/{curriculumProgress.stream4Total}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-violet-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.stream4Completed / curriculumProgress.stream4Total) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-300"
+                        className="h-full bg-purple-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4781,16 +5073,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('stream5')}
-                    className="p-3 rounded-xl bg-teal-950/20 border border-teal-500/25 hover:border-teal-500/50 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-teal-200 font-semibold truncate group-hover:text-teal-100" title="S5: Communities (CST)">S5: Communities (CST)</span>
-                      <span className="text-teal-300 font-mono font-bold text-[11px]">{curriculumProgress.stream5Completed}/{curriculumProgress.stream5Total}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="S5: Communities (CST)">S5: CST</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.stream5Completed}/{curriculumProgress.stream5Total}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-teal-500/20 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.stream5Completed / curriculumProgress.stream5Total) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all duration-300"
+                        className="h-full bg-teal-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
@@ -4799,25 +5091,25 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setActiveCategorySelectorKey('freeGenEd')}
-                    className="p-3 rounded-xl bg-slate-900/40 border border-slate-700/50 hover:border-slate-500 text-left transition cursor-pointer flex flex-col justify-between gap-1.5 group"
+                    className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] dark:hover:border-[#555] text-left transition cursor-pointer flex flex-col justify-between gap-1 group shadow-vercel-subtle"
                   >
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-300 font-semibold truncate group-hover:text-white" title="Free GenEd Elective">Free GenEd Elective</span>
-                      <span className="text-slate-200 font-mono font-bold text-[11px]">{curriculumProgress.freeGenEdCredits}/{curriculumProgress.freeGenEdTotal}</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-medium truncate" title="Free GenEd Elective">Free GenEd</span>
+                      <span className="text-[#888888] font-mono text-[10px]">{curriculumProgress.freeGenEdCredits}/{curriculumProgress.freeGenEdTotal}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[#04050d] border border-slate-700/40 rounded-full overflow-hidden p-0.5">
+                    <div className="h-1 w-full bg-[#ebebeb] dark:bg-[#262626] rounded-full overflow-hidden">
                       <div 
                         style={{ width: `${Math.min(100, (curriculumProgress.freeGenEdCredits / curriculumProgress.freeGenEdTotal) * 100)}%` }}
-                        className="h-full bg-gradient-to-r from-slate-400 to-slate-200 rounded-full transition-all duration-300"
+                        className="h-full bg-slate-500 rounded-full transition-all duration-300"
                       />
                     </div>
                   </button>
                 </div>
 
                 {/* GenEd Footer */}
-                <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
-                  <span>Completed: <strong className="text-blue-300 font-mono">{curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed + curriculumProgress.freeGenEdCredits}</strong> / 39 Cr</span>
-                  <span className="text-[11px] text-slate-400">GenEd distribution</span>
+                <div className="pt-3 border-t border-[#ebebeb] dark:border-[#262626] flex items-center justify-between text-xs text-[#888888]">
+                  <span>Completed: <strong className="text-[#171717] dark:text-white font-mono font-medium">{curriculumProgress.stream1Completed + curriculumProgress.stream2Completed + curriculumProgress.stream3Completed + curriculumProgress.stream4Completed + curriculumProgress.stream5Completed + curriculumProgress.freeGenEdCredits}</strong> / 39 Cr</span>
+                  <span className="text-[11px] text-[#888888]">Distribution</span>
                 </div>
               </div>
             </div>
@@ -4852,17 +5144,17 @@ export default function Home() {
 
                 {/* GPA Dashboard & Target Solver Card */}
                 <div className="xl:col-span-5 flex flex-col">
-                  <div className="bg-[#070913]/90 border border-blue-500/25 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden transition-all duration-300 hover:border-blue-500/40 space-y-4 flex flex-col justify-between h-full">
-                    <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-[0_0_18px_rgba(99,102,241,0.35)] shrink-0">
-                          <Gauge className="h-5 w-5" />
+                  <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 sm:p-6 shadow-vercel-card relative overflow-hidden transition-all duration-200 space-y-4 flex flex-col justify-between h-full">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#ebebeb] dark:border-[#262626]">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] flex items-center justify-center shrink-0">
+                          <Gauge className="h-4 w-4" />
                         </div>
                         <div>
-                          <h2 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
+                          <h2 className="text-xs font-semibold text-[#171717] dark:text-white uppercase tracking-wider">
                             GPA Dashboard &amp; Growth
                           </h2>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
+                          <p className="text-[11px] text-[#888888] mt-0.5">
                             Cumulative tracking &amp; target solver
                           </p>
                         </div>
@@ -4873,28 +5165,28 @@ export default function Home() {
                           setQuickGradesInitialSemIdx(0);
                           setIsQuickGradesModalOpen(true);
                         }}
-                        className="h-10 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-indigo-600/25 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                        className="h-8 px-3.5 bg-[#171717] dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 font-medium text-xs rounded-full shadow-vercel-subtle active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Zap className="h-3.5 w-3.5 fill-current text-white" />
+                        <Zap className="h-3 w-3 fill-current" />
                         <span>Quick Grades</span>
                       </button>
                     </div>
 
                     {/* Cumulative CGPA Box */}
-                    <div className="bg-[#05060f]/90 border border-blue-500/20 p-4 rounded-2xl flex items-center justify-between shadow-inner">
+                    <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] p-4 rounded-lg flex items-center justify-between shadow-vercel-subtle">
                       <div>
-                        <p className="text-[10px] text-blue-300 uppercase tracking-wider font-bold">Cumulative CGPA</p>
-                        <p className="text-3xl font-black text-white mt-1 tracking-tight font-mono">
+                        <p className="text-[10px] font-mono text-[#888888] uppercase tracking-wider">Cumulative CGPA</p>
+                        <p className="text-3xl font-semibold text-[#171717] dark:text-white mt-1 tracking-tight font-mono">
                           {cumulativeStats.cgpa.toFixed(2)}
                         </p>
                       </div>
                       <div className="pt-0.5">
                         {cumulativeStats.cgpa >= 2.0 ? (
-                          <span className="inline-flex items-center justify-center whitespace-nowrap text-xs font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300 px-3.5 py-1.5 rounded-xl uppercase tracking-wider shadow-[0_0_12px_rgba(59,130,246,0.15)]">
+                          <span className="inline-flex items-center justify-center whitespace-nowrap text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full uppercase tracking-wider">
                             Good Standing
                           </span>
                         ) : (
-                          <span className="inline-flex items-center justify-center whitespace-nowrap text-xs font-bold bg-rose-500/15 border border-rose-500/30 text-rose-400 px-3.5 py-1.5 rounded-xl uppercase tracking-wider shadow-[0_0_12px_rgba(244,63,94,0.15)]">
+                          <span className="inline-flex items-center justify-center whitespace-nowrap text-xs font-medium bg-red-500/10 border border-red-500/20 text-[#ee0000] px-3 py-1 rounded-full uppercase tracking-wider">
                             Probation Range
                           </span>
                         )}
@@ -4902,24 +5194,24 @@ export default function Home() {
                     </div>
 
                     {/* Target CGPA Solver Widget */}
-                    <div className="bg-[#05060f]/80 border border-blue-500/20 rounded-2xl p-4 shadow-lg space-y-3">
+                    <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-lg p-4 space-y-3 shadow-vercel-subtle">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="h-8 w-8 rounded-xl border border-blue-400/30 bg-blue-500/10 flex items-center justify-center text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.18)] shrink-0">
-                            <Crosshair className="h-4 w-4" />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="h-7 w-7 rounded-md border border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#1c1c1c] flex items-center justify-center text-[#0070f3] shrink-0">
+                            <Crosshair className="h-3.5 w-3.5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-bold tracking-wider text-slate-100 uppercase truncate">
-                              TARGET SOLVER
+                            <p className="text-[11px] font-semibold text-[#171717] dark:text-white uppercase truncate">
+                              Target Solver
                             </p>
-                            <p className="text-[10px] text-slate-400 truncate">
+                            <p className="text-[10px] text-[#888888] truncate">
                               CGPA Goal Calculator
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-[#030409] border border-blue-500/30 focus-within:border-blue-400/70 rounded-xl px-2.5 py-1 shadow-inner transition-colors shrink-0">
-                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Goal:</span>
+                        <div className="flex items-center gap-1.5 bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] focus-within:border-[#171717] dark:focus-within:border-white rounded-md px-2 py-0.5 transition-colors shrink-0">
+                          <span className="text-[10px] font-mono text-[#888888] uppercase">Goal:</span>
                           <input
                             type="number"
                             step="0.01"
@@ -4927,69 +5219,69 @@ export default function Home() {
                             max="4.0"
                             value={targetCgpa}
                             onChange={(e) => setTargetCgpa(e.target.value)}
-                            className="w-12 text-sm font-bold font-mono text-amber-300 bg-transparent focus:outline-none text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none selection:bg-blue-500/30"
+                            className="w-12 text-xs font-semibold font-mono text-[#171717] dark:text-white bg-transparent focus:outline-none text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
 
                       {targetSolverResult.isAchieved ? (
-                        <div className="flex items-center gap-2.5 bg-blue-950/25 border border-blue-800/40 rounded-xl p-3 text-blue-200">
-                          <div className="h-7 w-7 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-blue-400" />
+                        <div className="flex items-center gap-2.5 bg-blue-500/10 border border-blue-500/20 rounded-md p-2.5 text-[#0070f3]">
+                          <div className="h-6 w-6 rounded-md bg-white dark:bg-[#1a1a1a] border border-blue-500/30 flex items-center justify-center shrink-0">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-[#0070f3]" />
                           </div>
                           <div className="min-w-0 text-xs">
-                            <p className="font-bold text-blue-200 uppercase tracking-wider text-[10px]">Goal Achieved!</p>
-                            <p className="text-blue-300/80 text-[10px] mt-0.5">
-                              Final CGPA: <span className="font-bold font-mono text-blue-200">{targetSolverResult.maxPossibleCgpa.toFixed(2)}</span>
+                            <p className="font-semibold text-xs">Goal Achieved!</p>
+                            <p className="text-[11px] text-[#888888] mt-0.5">
+                              Final CGPA: <span className="font-mono font-semibold text-[#171717] dark:text-white">{targetSolverResult.maxPossibleCgpa.toFixed(2)}</span>
                             </p>
                           </div>
                         </div>
                       ) : targetSolverResult.requiredGpa > 4.00 ? (
-                        <div className="bg-rose-950/20 border border-rose-900/40 rounded-xl p-3 space-y-1.5 text-rose-300">
-                          <div className="flex items-center gap-2 text-rose-400 font-bold text-xs tracking-wider uppercase">
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-md p-2.5 space-y-1 text-[#ee0000]">
+                          <div className="flex items-center gap-1.5 font-semibold text-xs">
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                            <span className="text-[11px]">Target Out of Reach</span>
+                            <span>Target Out of Reach</span>
                           </div>
-                          <p className="text-[10px] text-rose-300/80 leading-relaxed">
-                            Even scoring flat <strong className="text-rose-200 font-bold">4.00 (all A&apos;s)</strong> yields a maximum possible CGPA of <span className="font-mono font-bold text-rose-200 bg-rose-500/10 px-1 py-0.5 rounded border border-rose-500/20">{targetSolverResult.maxPossibleCgpa.toFixed(2)}</span>.
+                          <p className="text-[11px] text-[#888888] leading-relaxed">
+                            Scoring 4.00 across remaining credits yields a maximum possible CGPA of <span className="font-mono font-medium text-[#171717] dark:text-white">{targetSolverResult.maxPossibleCgpa.toFixed(2)}</span>.
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-[#030409]/90 border border-blue-500/20 rounded-xl p-2.5 flex flex-col justify-between">
-                              <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
+                            <div className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] rounded-md p-2 flex flex-col justify-between">
+                              <span className="text-[9px] font-mono text-[#888888] uppercase">
                                 Required GPA / Sem
                               </span>
                               <div className="flex items-baseline gap-1.5 mt-1">
-                                <span className="text-lg font-bold font-mono text-white tracking-tight">
+                                <span className="text-base font-semibold font-mono text-[#171717] dark:text-white">
                                   {Math.max(0, targetSolverResult.requiredGpa).toFixed(2)}
                                 </span>
-                                <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.2 rounded font-mono">
+                                <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#f5f5f5] dark:bg-[#222] px-1 rounded">
                                   {targetSolverResult.letterEquivalent}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="bg-[#030409]/90 border border-blue-500/20 rounded-xl p-2.5 flex flex-col justify-between">
-                              <span className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">
+                            <div className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] rounded-md p-2 flex flex-col justify-between">
+                              <span className="text-[9px] font-mono text-[#888888] uppercase">
                                 Remaining Credits
                               </span>
                               <div className="flex items-baseline gap-1 mt-1">
-                                <span className="text-lg font-bold font-mono text-slate-100 tracking-tight">
+                                <span className="text-base font-semibold font-mono text-[#171717] dark:text-white">
                                   {targetSolverResult.remainingCredits}
                                 </span>
-                                <span className="text-[10px] font-medium text-slate-400">
+                                <span className="text-[10px] text-[#888888] font-mono">
                                   cr
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 bg-[#030409]/70 border border-blue-500/20 rounded-xl px-2.5 py-1.5 text-[10px] text-slate-300 leading-relaxed">
-                            <ArrowUpRight className="h-3 w-3 text-blue-400 shrink-0" />
+                          <div className="flex items-center gap-1.5 text-[11px] text-[#888888]">
+                            <ArrowUpRight className="h-3 w-3 text-[#0070f3] shrink-0" />
                             <span>
-                              Maintain <strong className="text-blue-300 font-semibold">{Math.max(0, targetSolverResult.requiredGpa).toFixed(2)} ({targetSolverResult.letterEquivalent})</strong> for goal <strong className="text-white font-semibold">{targetCgpa}</strong>.
+                              Maintain <strong className="font-mono text-[#171717] dark:text-white font-medium">{Math.max(0, targetSolverResult.requiredGpa).toFixed(2)} ({targetSolverResult.letterEquivalent})</strong> for goal <strong className="font-mono text-[#171717] dark:text-white font-medium">{targetCgpa}</strong>.
                             </span>
                           </div>
                         </div>
@@ -4997,16 +5289,16 @@ export default function Home() {
                     </div>
 
                     {/* Repeat ROI Analyzer Trigger */}
-                    <div className="bg-[#05060f]/80 border border-blue-500/20 rounded-2xl p-3.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="h-7 w-7 rounded-xl border border-indigo-400/30 bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
+                    <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-lg p-3 flex items-center justify-between gap-3 shadow-vercel-subtle">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-7 w-7 rounded-md border border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#1c1c1c] flex items-center justify-center text-[#7928ca] shrink-0">
                           <Repeat className="h-3.5 w-3.5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-100 uppercase truncate">
-                            REPEAT ROI
+                          <p className="text-[11px] font-semibold text-[#171717] dark:text-white uppercase truncate">
+                            Repeat ROI
                           </p>
-                          <p className="text-[10px] text-slate-400 truncate">
+                          <p className="text-[10px] text-[#888888] truncate">
                             Simulate grade boosts
                           </p>
                         </div>
@@ -5015,10 +5307,10 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setShowRoiModal(true)}
-                        className="px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                        className="px-2.5 py-1 bg-white dark:bg-[#1a1a1a] hover:bg-[#f0f0f0] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-white rounded-md text-[11px] font-medium flex items-center gap-1 transition cursor-pointer"
                       >
-                        <span>{roiAnalysis.candidates.length} courses</span>
-                        <ChevronDown className="h-3 w-3" />
+                        <span className="font-mono">{roiAnalysis.candidates.length} courses</span>
+                        <ChevronDown className="h-3 w-3 text-[#888888]" />
                       </button>
                     </div>
                   </div>
@@ -5026,20 +5318,20 @@ export default function Home() {
               </div>
             ) : (
               /* Tracker Only Mode Growth Card */
-              <div className="bg-[#070913]/90 border border-blue-500/25 rounded-3xl p-5 shadow-xl relative overflow-hidden backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] rounded-xl p-5 shadow-vercel-card relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                    <Sparkles className="h-5 w-5" />
+                  <div className="h-9 w-9 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#0070f3] shrink-0">
+                    <Calculator className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-extrabold text-blue-400 tracking-wider uppercase">CGPA Planner Mode</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Switch to Course + CGPA Planner to enable live SGPA/CGPA calculations, target solver goal tracking, and repeat grade analyzers.</p>
+                    <h3 className="text-xs font-semibold text-[#171717] dark:text-[#ededed] uppercase tracking-wider">CGPA Planner Mode</h3>
+                    <p className="text-xs text-[#888888] mt-0.5">Switch to Course + CGPA Planner to enable live SGPA/CGPA calculations, target solver goal tracking, and repeat grade analyzers.</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleModeToggle()}
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition cursor-pointer shrink-0 active:scale-95"
+                  className="px-4 py-2 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black font-medium text-xs rounded-lg shadow-vercel-subtle transition cursor-pointer shrink-0 active:scale-95"
                 >
                   Enable CGPA Mode
                 </button>
@@ -5049,70 +5341,72 @@ export default function Home() {
             {/* Full-Width Semester Planner Section */}
             <div id="semester-planner-section" className="w-full space-y-5">
 
-                {/* Semester Timelines Header */}
-                <div className="grid grid-cols-3 items-center border-b border-white/[0.08] pb-3">
-                  {/* Left Column: Title */}
-                  <div className="flex justify-start">
-                    <h2 className="text-base font-black tracking-tight text-white flex items-center gap-2">
-                      <span>Semester Planner</span>
-                    </h2>
+                {/* Semester Timelines Title as a Separate Element */}
+                <div className="pb-1">
+                  <h2 className="text-base sm:text-lg font-semibold tracking-tight text-[#171717] dark:text-[#ededed]">
+                    Semester Planner
+                  </h2>
+                </div>
+
+                {/* Buttons Row Under Title: Left (+ Add), Middle (List/Board Toggle), Right (Sort & Expand) */}
+                <div className="flex items-center justify-between border-b border-[#ebebeb] dark:border-[#262626] pb-3.5 gap-2">
+                  {/* Very Left: + Add Button */}
+                  <div className="flex items-center justify-start">
+                    <button
+                      type="button"
+                      onClick={handleTriggerAddSemester}
+                      className="h-8 px-3 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black font-medium text-xs rounded-lg shadow-vercel-subtle active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      title="Add Semester"
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </button>
                   </div>
 
-                  {/* Center Column: View Switcher Toggle */}
-                  <div className="flex justify-center items-center">
-                    <div className="flex items-center bg-[#04050d] border border-blue-500/20 rounded-2xl p-1 shadow-inner">
+                  {/* Middle: View Switcher Toggle */}
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center h-8 bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] rounded-lg p-0.5 shadow-vercel-subtle">
                       <button
                         type="button"
                         onClick={() => handleToggleViewMode("list")}
                         title="List Feed"
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        className={`h-full inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                           currentLayout === "list"
-                            ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30"
-                            : "text-zinc-400 hover:text-white"
+                            ? "bg-white dark:bg-[#262626] text-[#171717] dark:text-[#ededed] shadow-vercel-subtle"
+                            : "text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]"
                         }`}
                       >
                         <List className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">List</span>
+                        <span className="hidden xs:inline">List</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleToggleViewMode("kanban")}
                         title="Kanban Board"
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        className={`h-full inline-flex items-center gap-1.5 px-2.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                           currentLayout === "kanban"
-                            ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30"
-                            : "text-zinc-400 hover:text-white"
+                            ? "bg-white dark:bg-[#262626] text-[#171717] dark:text-[#ededed] shadow-vercel-subtle"
+                            : "text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]"
                         }`}
                       >
                         <Columns className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Board</span>
+                        <span className="hidden xs:inline">Board</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Right Column: Actions */}
-                  <div className="flex justify-end items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleTriggerAddSemester}
-                      className="h-9 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white font-bold text-xs rounded-2xl shadow-md shadow-indigo-600/25 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                      title="Add Semester"
-                    >
-                      <Plus className="h-4 w-4 stroke-[2.5]" />
-                      <span className="hidden sm:inline">Add Semester</span>
-                      <span className="sm:hidden">Add</span>
-                    </button>
-
+                  {/* Very Right: The other two buttons (Sort & Expand/Collapse) */}
+                  <div className="flex items-center justify-end gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => handleToggleSemesterSort()}
-                      className="bg-[#04050d] hover:bg-[#090b18] border border-blue-500/25 hover:border-blue-400/40 text-blue-300 hover:text-white p-2 rounded-2xl transition-colors flex items-center justify-center h-9 w-9 shrink-0 cursor-pointer shadow-sm active:scale-95 group"
-                      title={semesterSortOrder === 'asc' ? "Sorted: First → Last (Click for Last → First)" : "Sorted: Last → First (Click for First → Last)"}
+                      className="bg-[#f5f5f5] dark:bg-[#141414] hover:bg-[#ebebeb] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] p-2 rounded-lg transition-colors flex items-center justify-center h-8 w-8 shrink-0 cursor-pointer shadow-vercel-subtle active:scale-95"
+                      title={semesterSortOrder === 'asc' ? "Sorted: First → Last" : "Sorted: Last → First"}
                     >
                       <svg
-                        className="h-4.5 w-4.5 fill-none stroke-current"
+                        className="h-4 w-4 fill-none stroke-current"
                         viewBox="0 0 24 24"
-                        strokeWidth="2.3"
+                        strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
@@ -5134,11 +5428,11 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={handleToggleAllCollapse}
-                      className="bg-[#04050d] hover:bg-[#090b18] border border-blue-500/25 hover:border-blue-400/40 text-blue-300 hover:text-white p-2 rounded-2xl transition-colors flex items-center justify-center h-9 w-9 shrink-0 cursor-pointer shadow-sm active:scale-95"
+                      className="bg-[#f5f5f5] dark:bg-[#141414] hover:bg-[#ebebeb] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] p-2 rounded-lg transition-colors flex items-center justify-center h-8 w-8 shrink-0 cursor-pointer shadow-vercel-subtle active:scale-95"
                       title={isAnyExpanded ? "Collapse All" : "Expand All"}
                     >
                       {isAnyExpanded ? (
-                        <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <line x1="3" y1="6" x2="13" y2="6" />
                           <line x1="3" y1="12" x2="13" y2="12" />
                           <line x1="3" y1="18" x2="13" y2="18" />
@@ -5146,7 +5440,7 @@ export default function Home() {
                           <path d="M18 20V14M18 14L15 17M18 14L21 17" />
                         </svg>
                       ) : (
-                        <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <line x1="3" y1="6" x2="13" y2="6" />
                           <line x1="3" y1="12" x2="13" y2="12" />
                           <line x1="3" y1="18" x2="13" y2="18" />
@@ -5163,7 +5457,7 @@ export default function Home() {
                   <div 
                     ref={topScrollBarRef} 
                     onScroll={handleTopScroll}
-                    className="overflow-x-auto custom-scrollbar h-2.5 mb-2 w-full shrink-0"
+                    className="overflow-x-auto custom-scrollbar h-2 mb-2 w-full shrink-0"
                   >
                     <div style={{ width: `${kanbanScrollWidth}px`, height: '1px' }} />
                   </div>
@@ -5173,17 +5467,20 @@ export default function Home() {
             <div 
               ref={boardContainerRef}
               onScroll={handleBoardScroll}
+              onWheel={handleBoardWheel}
+              onMouseDown={handleBoardMouseDown}
+              onMouseMove={handleBoardMouseMove}
+              onMouseUp={handleBoardMouseUp}
+              onMouseLeave={handleBoardMouseUp}
               className={
                 currentLayout === 'kanban' 
-                  ? "flex flex-row gap-5 overflow-x-auto pt-2 pb-6 px-1 sm:px-2 items-start snap-x max-w-full min-w-0 no-scrollbar" 
-                  : "space-y-6"
+                  ? "flex flex-row gap-5 overflow-x-auto pt-2 pb-6 px-1 sm:px-2 items-start max-w-full min-w-0 touch-pan-x cursor-grab active:cursor-grabbing custom-scrollbar" 
+                  : "space-y-4"
               }
             >
               {displayedSemesters.map(({ sem, originalIdx: semIdx }) => {
                 const stats = semesterStats.find(s => s.id === sem.id);
                 const visibleCourses = sem.courses.filter(c => c.code !== "CSE400");
-                const hasCSE400 = sem.courses.some(c => c.code === "CSE400");
-                const isSemester9Plus = semIdx >= 8; // index 8 is the 9th semester card
                 const intake = semesterIntakes[semIdx];
                 const isAllCompleted = visibleCourses.length > 0 && visibleCourses.every(c => c.isCompleted);
 
@@ -5204,69 +5501,66 @@ export default function Home() {
                       currentLayout === 'kanban' 
                         ? "w-[84vw] sm:w-[340px] min-w-[280px] max-w-[340px] flex-shrink-0 snap-start flex flex-col" 
                         : "w-full flex flex-col"
-                    } border rounded-3xl overflow-visible shadow-xl backdrop-blur-md hover:border-white/[0.12] transition-colors duration-200 relative ${
+                    } border border-[#ebebeb] dark:border-[#262626] rounded-xl overflow-visible shadow-vercel-card bg-white dark:bg-[#0c0c0c] transition-colors duration-150 relative ${
                       draggingCourseCode && dragOverSemesterId === sem.id 
-                        ? "border-dashed border-2 border-indigo-500 bg-indigo-500/10 shadow-[0_0_30px_rgba(99,102,241,0.2)]" 
-                        : sem.isRS 
-                          ? "border-indigo-500/30 bg-[#0a0b12]/95 shadow-[0_0_20px_rgba(99,102,241,0.06)]" 
-                          : "border-white/[0.08] bg-[#07070b]/95"
+                        ? "border-dashed border-2 border-[#171717] dark:border-white bg-[#f5f5f5] dark:bg-[#141414]" 
+                        : ""
                     }`}
                   >
-                    <div className="absolute top-0 right-0 h-28 w-28 bg-indigo-500/[0.02] rounded-full blur-2xl pointer-events-none" />
                     {/* Semester Card Header */}
                     {sem.isCollapsed ? (
                       /* Collapsed Compact State */
-                      <div className="bg-white/[0.02] p-3.5 rounded-3xl flex items-center justify-between gap-2.5 transition-colors duration-150">
+                      <div className="bg-[#fafafa] dark:bg-[#111111] p-3.5 rounded-xl flex items-center justify-between gap-2.5 transition-colors duration-150">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <button
                             onClick={() => handleToggleSemesterAllCompleted(sem.id)}
                             title={isAllCompleted ? "Mark all incomplete" : "Mark all completed"}
-                            className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                            className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                               isAllCompleted
-                                ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_10px_rgba(59,130,246,0.6)]'
-                                : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                                ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                                : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#141414]'
                             }`}
                           >
                             {isAllCompleted && (
-                              <Check className="h-3 w-3 text-white stroke-[3]" />
+                              <Check className="h-3 w-3 stroke-[3]" />
                             )}
                           </button>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <h3 className="font-black text-sm text-white tracking-tight truncate">
+                              <h3 className="font-semibold text-xs text-[#171717] dark:text-white tracking-tight truncate">
                                 {`Semester ${semIdx + 1}`}
                               </h3>
-                              <span className="text-[11px] text-slate-400 font-semibold font-mono">
+                              <span className="text-[11px] text-[#888888] font-mono">
                                 ({sem.term || intake?.term || 'Spring'} {sem.year || intake?.year || 2025})
                               </span>
                               {sem.isRS && (
-                                <span className="text-[9px] font-extrabold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                <span className="text-[9px] font-mono font-medium bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] px-1.5 py-0.2 rounded uppercase">
                                   RS
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                              <span><strong className="text-white font-mono">{stats?.credits ?? 0}</strong> Credits</span>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#888888]">
+                              <span><strong className="text-[#171717] dark:text-white font-mono font-medium">{stats?.credits ?? 0}</strong> Credits</span>
                               {mode === 'gpa' && stats?.gpa != null && (
                                 <>
-                                  <span className="text-slate-600">•</span>
-                                  <span className="text-indigo-300 font-bold font-mono">GPA {stats.gpa.toFixed(2)}</span>
+                                  <span className="text-[#888888]">•</span>
+                                  <span className="text-[#0070f3] font-mono font-medium">GPA {stats.gpa.toFixed(2)}</span>
                                 </>
                               )}
-                              <span className="text-slate-600">•</span>
+                              <span className="text-[#888888]">•</span>
                               <span>{visibleCourses.length} course{visibleCourses.length !== 1 ? 's' : ''}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Right: Expand & Delete */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleToggleSemesterCollapse(sem.id);
                             }}
-                            className="w-7 h-7 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer active:scale-95"
+                            className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#888888] hover:text-[#171717] dark:hover:text-white transition-colors cursor-pointer"
                             title="Expand Semester"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
@@ -5274,7 +5568,7 @@ export default function Home() {
 
                           <button
                             onClick={() => handleDeleteSemester(sem.id)}
-                            className="w-7 h-7 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 border border-white/[0.08] hover:border-rose-500/30 text-slate-400 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                            className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-red-500/10 border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#ee0000] flex items-center justify-center transition-colors cursor-pointer"
                             title="Delete Semester"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -5283,36 +5577,36 @@ export default function Home() {
                       </div>
                     ) : (
                       /* Expanded State Header */
-                      <div className="bg-white/[0.02] p-4 rounded-t-3xl border-b border-white/[0.06] space-y-3 transition-colors duration-150">
+                      <div className="bg-[#fafafa] dark:bg-[#111111] p-3.5 rounded-t-xl border-b border-[#ebebeb] dark:border-[#262626] space-y-2.5 transition-colors duration-150">
                         {/* Row 1: Checkbox + Title on left; Minimize + Trash on right */}
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <button
                               onClick={() => handleToggleSemesterAllCompleted(sem.id)}
                               title={isAllCompleted ? "Mark all incomplete" : "Mark all completed"}
-                              className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                              className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                                 isAllCompleted
-                                  ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_10px_rgba(59,130,246,0.6)]'
-                                  : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                                  ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                                  : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#141414]'
                               }`}
                             >
                               {isAllCompleted && (
-                                <Check className="h-3 w-3 text-white stroke-[3]" />
+                                <Check className="h-3 w-3 stroke-[3]" />
                               )}
                             </button>
-                            <h3 className="font-black text-sm text-white tracking-tight truncate">
+                            <h3 className="font-semibold text-xs text-[#171717] dark:text-white tracking-tight truncate">
                               {`Semester ${semIdx + 1}`}
                             </h3>
                           </div>
 
                           {/* Top Right Action Group: Minimize & Delete */}
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleToggleSemesterCollapse(sem.id);
                               }}
-                              className="w-7 h-7 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer active:scale-95"
+                              className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-[#f5f5f5] dark:hover:bg-[#1f1f1f] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#888888] hover:text-[#171717] dark:hover:text-white transition-colors cursor-pointer"
                               title="Minimize Semester"
                             >
                               <ChevronUp className="h-3.5 w-3.5" />
@@ -5320,7 +5614,7 @@ export default function Home() {
 
                             <button
                               onClick={() => handleDeleteSemester(sem.id)}
-                              className="w-7 h-7 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 border border-white/[0.08] hover:border-rose-500/30 text-slate-400 hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                              className="w-7 h-7 rounded-md bg-white dark:bg-[#141414] hover:bg-red-500/10 border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#ee0000] flex items-center justify-center transition-colors cursor-pointer"
                               title="Delete Semester"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -5334,7 +5628,7 @@ export default function Home() {
                             <select
                               value={sem.term || intake?.term || 'Spring'}
                               onChange={(e) => handleOverrideIntake(sem.id, e.target.value as any, sem.year || intake?.year || onboardingData.startingYear)}
-                              className="bg-[#08080d] border border-white/[0.1] hover:border-indigo-400/40 text-[11px] text-slate-200 rounded-xl px-2.5 py-1 outline-none cursor-pointer focus:border-indigo-400 font-semibold transition shadow-inner"
+                              className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[11px] text-[#171717] dark:text-[#ededed] rounded-md px-2 py-1 outline-none cursor-pointer font-medium"
                             >
                               <option value="Spring">Spring</option>
                               <option value="Summer">Summer</option>
@@ -5343,7 +5637,7 @@ export default function Home() {
                             <select
                               value={sem.year || intake?.year || 2025}
                               onChange={(e) => handleOverrideIntake(sem.id, sem.term || intake?.term || 'Spring', parseInt(e.target.value))}
-                              className="bg-[#08080d] border border-white/[0.1] hover:border-indigo-400/40 text-[11px] text-slate-200 rounded-xl px-2.5 py-1 outline-none cursor-pointer focus:border-indigo-400 font-semibold transition shadow-inner"
+                              className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[11px] text-[#171717] dark:text-[#ededed] rounded-md px-2 py-1 outline-none cursor-pointer font-medium"
                             >
                               {Array.from({ length: 101 }, (_, i) => 2001 + i).map(year => (
                                 <option key={year} value={year}>{year}</option>
@@ -5356,7 +5650,7 @@ export default function Home() {
                               setSwappingCourseCode(null);
                               setActiveCourseSelectorSemesterId(sem.id);
                             }}
-                            className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white px-3 py-1 rounded-xl flex items-center gap-1.5 text-xs font-bold transition shadow-md shadow-indigo-600/20 cursor-pointer shrink-0"
+                            className="bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black active:scale-95 px-2.5 py-1 rounded-md flex items-center gap-1 text-xs font-medium shadow-vercel-subtle transition cursor-pointer shrink-0"
                             title="Add Course to Semester"
                           >
                             <PlusCircle className="h-3.5 w-3.5 shrink-0" />
@@ -5365,13 +5659,13 @@ export default function Home() {
                         </div>
 
                         {/* Row 3: Metrics (Credits, GPA, RS status) */}
-                        <div className="flex items-center justify-between pt-2 border-t border-white/[0.04] text-xs">
+                        <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#262626] text-xs">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-medium text-slate-300 bg-[#090a10] border border-white/[0.08] px-2.5 py-0.5 rounded-lg shadow-inner">
-                              Credits: <strong className="text-white font-mono">{stats?.credits ?? 0}</strong>
+                            <span className="text-[11px] font-medium text-[#888888] bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] px-2 py-0.5 rounded">
+                              Credits: <strong className="text-[#171717] dark:text-white font-mono">{stats?.credits ?? 0}</strong>
                             </span>
                             {mode === 'gpa' && stats?.gpa != null && (
-                              <span className="text-[11px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/25 px-2.5 py-0.5 rounded-lg">
+                              <span className="text-[11px] font-medium text-[#0070f3] bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded">
                                 GPA: <strong className="font-mono">{stats.gpa.toFixed(2)}</strong>
                               </span>
                             )}
@@ -5379,13 +5673,13 @@ export default function Home() {
 
                           <div>
                             {sem.isRS ? (
-                              <span className="text-[10px] font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-lg tracking-wider uppercase select-none shadow-sm">
+                              <span className="text-[10px] font-mono font-medium bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] text-[#0070f3] px-2 py-0.5 rounded tracking-wider uppercase select-none">
                                 RS
                               </span>
                             ) : (
                               <button
                                 onClick={() => handleMarkAsRS(sem.id)}
-                                className="text-[10px] font-bold bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.16] text-slate-400 hover:text-slate-200 px-2.5 py-0.5 rounded-lg tracking-wider uppercase transition cursor-pointer"
+                                className="text-[10px] font-medium bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white px-2 py-0.5 rounded transition cursor-pointer"
                               >
                                 Mark as RS
                               </button>
@@ -5397,10 +5691,10 @@ export default function Home() {
 
                     {/* Course list grid in Semester Card */}
                     {!sem.isCollapsed && (
-                      <div className={`p-4 flex-grow ${currentLayout === 'kanban' ? 'space-y-0' : 'space-y-2.5'} animate-in fade-in duration-150`}>
+                      <div className={`p-3 flex-grow ${currentLayout === 'kanban' ? 'space-y-0' : 'space-y-2'} animate-in fade-in duration-150`}>
                       
                       {visibleCourses.length === 0 && (
-                        <div className="py-8 text-center text-slate-400 text-xs italic">
+                        <div className="py-6 text-center text-[#888888] text-xs">
                           No courses scheduled in this semester.
                         </div>
                       )}
@@ -5411,7 +5705,6 @@ export default function Home() {
                         const warnings = prerequisiteWarnings[`${sem.id}_${c.code}`];
                         const attempt = courseAttemptStats[`${sem.id}_${c.code}`];
                         
-                        // Filter out CSE400 from semester cards (rendered globally as standalone widget instead)
                         if (isCSE400Row) {
                           return null;
                         }
@@ -5434,15 +5727,13 @@ export default function Home() {
                               setDraggingCourseCode(null);
                               setDraggingSourceSemesterId(null);
                             }}
-                            className={`group transition-all duration-200 ${
+                            className={`group transition-all duration-150 ${
                               currentLayout === 'kanban' 
-                                ? `p-3.5 border rounded-2xl bg-[#09090f]/90 hover:bg-[#0e0e16]/95 shadow-md mb-3 cursor-grab flex flex-col justify-between gap-3 ${theme.cardBorder} ${theme.cardGlow}` 
-                                : `p-3.5 sm:p-4 rounded-2xl bg-[#09090f]/80 hover:bg-[#0e0e16]/90 border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 relative ${theme.cardBorder} ${theme.cardGlow}`
+                                ? `p-3 border border-[#ebebeb] dark:border-[#262626] rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] shadow-vercel-subtle mb-2 cursor-grab flex flex-col justify-between gap-2.5` 
+                                : `p-3 rounded-lg bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] border border-[#ebebeb] dark:border-[#262626] shadow-vercel-subtle flex flex-col md:flex-row md:items-center justify-between gap-2.5 relative`
                             } ${
                               draggingCourseCode === c.code 
-                                ? currentLayout === 'kanban'
-                                  ? "scale-105 shadow-2xl cursor-grabbing border-indigo-500 bg-indigo-950/40" 
-                                  : "border-indigo-500 bg-indigo-950/30"
+                                ? "border-[#171717] dark:border-white shadow-vercel-float" 
                                 : ""
                             }`}
                           >
@@ -5455,14 +5746,14 @@ export default function Home() {
                                 <button
                                   onClick={() => handleCompletionToggle(sem.id, c.code, !c.isCompleted)}
                                   title={c.isCompleted ? "Mark as incomplete" : "Mark as complete"}
-                                  className={`h-4.5 w-4.5 rounded-md border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none ${
+                                  className={`h-4 w-4 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none ${
                                     c.isCompleted
-                                      ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                                      : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                                      ? 'bg-[#171717] dark:bg-[#ededed] border-[#171717] dark:border-[#ededed] text-white dark:text-black'
+                                      : 'border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#141414]'
                                   }`}
                                 >
                                   {c.isCompleted && (
-                                    <Check className="h-3 w-3 text-white stroke-[3]" />
+                                    <Check className="h-3 w-3 stroke-[3]" />
                                   )}
                                 </button>
                                 
@@ -5470,7 +5761,7 @@ export default function Home() {
                                   <select
                                     value={c.grade}
                                     onChange={(e) => handleGradeChange(sem.id, c.code, e.target.value)}
-                                    className="bg-[#050508] border border-white/[0.1] hover:border-indigo-400/50 text-[11px] font-bold text-indigo-300 rounded-lg px-2 py-0.5 focus:border-indigo-400 outline-none cursor-pointer shadow-inner transition"
+                                    className="bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-xs font-mono font-medium text-[#171717] dark:text-[#ededed] rounded px-1.5 py-0.5 outline-none cursor-pointer"
                                   >
                                     <option value="">Grade</option>
                                     {Object.keys(GRADING_SCALE).map(g => (
@@ -5480,7 +5771,7 @@ export default function Home() {
                                 )}
 
                                 {mode === 'gpa' && !isCreditCourse && c.isCompleted && (
-                                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-lg uppercase tracking-wider">
+                                  <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase">
                                     Passed
                                   </span>
                                 )}
@@ -5488,26 +5779,26 @@ export default function Home() {
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className={`font-mono font-black text-xs sm:text-sm tracking-tight px-2 py-0.5 rounded-lg border shadow-inner ${theme.codePill}`}>
+                                  <span className="font-mono font-semibold text-xs tracking-tight px-1.5 py-0.5 rounded bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-white">
                                     {c.code}
                                   </span>
-                                  <span className="text-slate-200 group-hover:text-white font-semibold text-xs sm:text-sm transition-colors truncate max-w-[200px] sm:max-w-none">
+                                  <span className="text-[#171717] dark:text-[#ededed] font-medium text-xs truncate max-w-[200px] sm:max-w-none">
                                     {courseDetails?.title ?? "Custom Elective Course"}
                                   </span>
-                                  <span className="text-[10px] text-slate-300 bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded-md font-mono font-semibold">
+                                  <span className="text-[10px] text-[#888888] bg-white dark:bg-[#1a1a1a] border border-[#ebebeb] dark:border-[#262626] px-1.5 py-0.5 rounded font-mono">
                                     {(courseDetails?.credits ?? 3)} Cr
                                   </span>
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border select-none ${theme.badge}`}>
+                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${theme.badge}`}>
                                     {theme.label}
                                   </span>
                                   {renderMandatoryBadge(c.code)}
 
                                   {/* Retake & Repeat badges */}
                                   {attempt?.badge && (
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                    <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full ${
                                       attempt.isError 
-                                        ? 'bg-rose-500/15 border border-rose-500/30 text-rose-400' 
-                                        : 'bg-amber-500/15 border border-amber-500/30 text-amber-400'
+                                        ? 'bg-red-500/10 border border-red-500/20 text-[#ee0000]' 
+                                        : 'bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400'
                                     }`}>
                                       {attempt.badge}
                                     </span>
@@ -5515,21 +5806,21 @@ export default function Home() {
                                 </div>
 
                                 {/* Warning outputs */}
-                                <div className="space-y-1 mt-1.5">
+                                <div className="space-y-1 mt-1">
                                   {warnings && warnings.type === 'hard' && (
-                                    <div className="flex items-center gap-1.5 text-rose-400 font-bold text-[10px]">
-                                      <AlertTriangle className="h-3 w-3 shrink-0 text-rose-400" />
+                                    <div className="flex items-center gap-1.5 text-[#ee0000] text-[10px] font-medium">
+                                      <AlertTriangle className="h-3 w-3 shrink-0" />
                                       <span>Prerequisite warning: Requires {warnings.missing.join(", ")} prior to this semester</span>
                                     </div>
                                   )}
                                   {warnings && warnings.type === 'soft' && (
-                                    <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[10px]">
-                                      <Info className="h-3 w-3 shrink-0 text-amber-400" />
-                                      <span>Tip: Soft Prerequisite recommended first ({warnings.missing.join(", ")})</span>
+                                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[10px] font-medium">
+                                      <Info className="h-3 w-3 shrink-0" />
+                                      <span>Soft Prerequisite recommended ({warnings.missing.join(", ")})</span>
                                     </div>
                                   )}
                                   {attempt?.isError && (
-                                    <div className="flex items-center gap-1.5 text-rose-400 font-medium text-[10px]">
+                                    <div className="flex items-center gap-1.5 text-[#ee0000] text-[10px] font-medium">
                                       <AlertTriangle className="h-3 w-3 shrink-0" />
                                       <span>{attempt.statusText}</span>
                                     </div>
@@ -5539,7 +5830,7 @@ export default function Home() {
                             </div>
 
                             {/* Right side selectors and management */}
-                            <div className="flex items-center gap-1.5 self-end md:self-auto shrink-0">
+                            <div className="flex items-center gap-1 self-end md:self-auto shrink-0">
                               
                               {/* Move course dropdown/selection */}
                               <div className="relative">
@@ -5550,7 +5841,7 @@ export default function Home() {
                                       e.target.value = ""; // Reset
                                     }
                                   }}
-                                  className="bg-[#050508] hover:bg-[#0c0c12] border border-white/[0.08] hover:border-white/[0.18] text-[10px] font-semibold text-slate-300 rounded-xl px-2.5 py-1.5 cursor-pointer transition focus:outline-none shadow-sm"
+                                  className="bg-white dark:bg-[#1a1a1a] hover:bg-[#fafafa] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[10px] font-medium text-[#888888] hover:text-[#171717] dark:hover:text-white rounded-md px-2 py-1 cursor-pointer transition focus:outline-none"
                                 >
                                   <option value="">Move To...</option>
                                   {semesters.filter(s => s.id !== sem.id).map(s => {
@@ -5561,7 +5852,7 @@ export default function Home() {
                                     const alreadyInDest = s.courses.some(course => course.code === c.code);
                                     return (
                                       <option key={s.id} value={s.id} disabled={isLocked || alreadyInDest}>
-                                        {s.name} {alreadyInDest ? "(Already added)" : (isLocked ? "🔒" : "")}
+                                        {s.name} {alreadyInDest ? "(Added)" : (isLocked ? "🔒" : "")}
                                       </option>
                                     );
                                   })}
@@ -5575,18 +5866,18 @@ export default function Home() {
                                   setSwappingCourseCode(c.code);
                                 }}
                                 title="Swap Course"
-                                className="h-7 w-7 rounded-xl bg-white/[0.03] hover:bg-indigo-500/20 border border-white/[0.08] hover:border-indigo-500/40 text-slate-400 hover:text-indigo-300 flex items-center justify-center transition cursor-pointer shadow-sm"
+                                className="h-6 w-6 rounded-md bg-white dark:bg-[#1a1a1a] hover:bg-[#f0f0f0] dark:hover:bg-[#222] border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#171717] dark:hover:text-white flex items-center justify-center transition cursor-pointer"
                               >
-                                <ArrowRightLeft className="h-3.5 w-3.5" />
+                                <ArrowRightLeft className="h-3 w-3" />
                               </button>
 
                               {/* Remove Course button */}
                               <button
                                 onClick={() => handleRemoveCourse(sem.id, c.code, cIdx)}
-                                className="h-7 w-7 rounded-xl bg-white/[0.03] hover:bg-rose-500/20 border border-white/[0.08] hover:border-rose-500/40 text-slate-400 hover:text-rose-400 flex items-center justify-center transition cursor-pointer shadow-sm"
+                                className="h-6 w-6 rounded-md bg-white dark:bg-[#1a1a1a] hover:bg-red-500/10 border border-[#ebebeb] dark:border-[#262626] text-[#888888] hover:text-[#ee0000] flex items-center justify-center transition cursor-pointer"
                                 title="Remove Course"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3 w-3" />
                               </button>
 
                             </div>
@@ -5605,20 +5896,20 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handleTriggerAddSemester}
-                    className="h-full min-h-[320px] rounded-3xl border-2 border-dashed border-blue-500/25 hover:border-blue-400/60 bg-[#070712]/60 hover:bg-blue-500/[0.06] p-6 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-white transition-all cursor-pointer group active:scale-[0.99] shadow-lg"
+                    className="h-full min-h-[300px] rounded-xl border border-dashed border-[#ebebeb] dark:border-[#333] hover:border-[#888888] bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] p-6 flex flex-col items-center justify-center gap-2.5 text-[#888888] hover:text-[#171717] dark:hover:text-white transition cursor-pointer group active:scale-[0.99] shadow-vercel-subtle"
                     title="Add Next Semester"
                   >
-                    <div className="h-12 w-12 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500/25 transition-all shadow-[0_0_20px_rgba(59,130,246,0.25)]">
-                      <Plus className="h-6 w-6 stroke-[2.5]" />
+                    <div className="h-10 w-10 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white group-hover:scale-105 transition-all shadow-vercel-subtle">
+                      <Plus className="h-5 w-5 stroke-[2.5]" />
                     </div>
                     <div className="text-center">
-                      <div className="font-extrabold text-sm text-white group-hover:text-blue-300 transition-colors">
+                      <div className="font-semibold text-xs text-[#171717] dark:text-white transition-colors">
                         Add {getOrdinal(semesters.length + 1)} Semester
                       </div>
-                      <div className="text-xs text-slate-400 mt-1 font-mono">
+                      <div className="text-[11px] text-[#888888] mt-1 font-mono">
                         {nextPredictedIntake.term} {nextPredictedIntake.year}
                       </div>
-                      <span className="inline-block mt-3 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-600/30">
+                      <span className="inline-block mt-3 px-3 py-1 rounded-full bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-black text-xs font-medium shadow-vercel-subtle">
                         + Add Courses
                       </span>
                     </div>
@@ -5632,17 +5923,17 @@ export default function Home() {
               <button
                 type="button"
                 onClick={handleTriggerAddSemester}
-                className="w-full py-5 px-6 rounded-3xl border-2 border-dashed border-blue-500/25 hover:border-blue-400/60 bg-[#070712]/60 hover:bg-blue-500/[0.06] text-slate-300 hover:text-white transition-all flex flex-col sm:flex-row items-center justify-center gap-3 cursor-pointer group shadow-lg active:scale-[0.99]"
+                className="w-full py-4 px-5 rounded-xl border border-dashed border-[#ebebeb] dark:border-[#333] hover:border-[#888888] bg-[#fafafa] dark:bg-[#111111] hover:bg-white dark:hover:bg-[#161616] text-[#888888] hover:text-[#171717] dark:hover:text-white transition flex flex-col sm:flex-row items-center justify-center gap-3 cursor-pointer group shadow-vercel-subtle active:scale-[0.99]"
                 title="Add Next Semester"
               >
-                <div className="h-10 w-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-110 group-hover:bg-blue-500/25 transition-all shadow-[0_0_15px_rgba(59,130,246,0.2)] shrink-0">
-                  <Plus className="h-5 w-5 stroke-[2.5]" />
+                <div className="h-8 w-8 rounded-lg bg-white dark:bg-[#1c1c1c] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#171717] dark:text-white group-hover:scale-105 transition shrink-0 shadow-vercel-subtle">
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
                 </div>
                 <div className="text-center sm:text-left">
-                  <span className="text-sm font-extrabold text-white group-hover:text-blue-300 transition-colors">
+                  <span className="text-xs font-semibold text-[#171717] dark:text-white transition-colors">
                     Add {getOrdinal(semesters.length + 1)} Semester
                   </span>
-                  <span className="block text-xs text-slate-400 font-medium mt-0.5">
+                  <span className="block text-[11px] text-[#888888] font-mono mt-0.5">
                     {nextPredictedIntake.term} {nextPredictedIntake.year} • Click to create term &amp; enroll courses
                   </span>
                 </div>
@@ -5660,45 +5951,45 @@ export default function Home() {
       </div>
 
       {/* Connect with me Footer at very bottom of dashboard */}
-      <footer className="w-full mt-auto pt-8 pb-28 lg:pb-12 border-t border-white/[0.08] flex flex-col items-center justify-center gap-4 text-center">
+      <footer className="w-full mt-auto pt-8 pb-28 lg:pb-12 border-t border-[#ebebeb] dark:border-[#262626] flex flex-col items-center justify-center gap-3 text-center">
         {/* Connect with me social links */}
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs font-bold text-slate-400">
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold leading-none">Connect with me:</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs font-medium text-[#888888]">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[#888888]">Connect:</span>
           <a
             href="https://github.com/fakekhanabdullah"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#060814] border border-blue-500/20 hover:border-blue-400/50 hover:text-blue-300 transition leading-none text-slate-300"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle"
           >
-            <svg className="h-3.5 w-3.5 fill-current text-slate-400 hover:text-blue-300 shrink-0" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-            <span className="leading-none">GitHub</span>
+            <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            <span>GitHub</span>
           </a>
-          <span className="text-zinc-700 self-center">|</span>
+          <span className="text-[#888888]">•</span>
           <a
             href="https://www.linkedin.com/in/khan-abdullahh"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#060814] border border-blue-500/20 hover:border-blue-400/50 hover:text-blue-300 transition leading-none text-slate-300"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-[#111111] border border-[#ebebeb] dark:border-[#262626] hover:border-[#888888] text-[#171717] dark:text-[#ededed] transition shadow-vercel-subtle"
           >
-            <svg className="h-3.5 w-3.5 fill-current text-slate-400 hover:text-blue-300 shrink-0" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-            <span className="leading-none">LinkedIn</span>
+            <svg className="h-3.5 w-3.5 fill-current shrink-0" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            <span>LinkedIn</span>
           </a>
         </div>
 
-        {/* Legal Links for Google OAuth & Compliance */}
-        <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-          <a href="/privacy" className="hover:text-blue-300 underline transition">
+        {/* Legal Links */}
+        <div className="flex items-center gap-3 text-xs text-[#888888]">
+          <a href="/privacy" className="hover:text-[#171717] dark:hover:text-white underline transition">
             Privacy Policy
           </a>
           <span>•</span>
-          <a href="/terms" className="hover:text-blue-300 underline transition">
+          <a href="/terms" className="hover:text-[#171717] dark:hover:text-white underline transition">
             Terms of Service
           </a>
         </div>
 
         {/* Muted Copyright Disclaimer */}
-        <div className="text-[11px] text-slate-400 leading-relaxed font-medium">
-          <p>© 2026 Flow136. Made with care by <strong className="text-slate-200">Khan Abdullah</strong></p>
+        <div className="text-[11px] text-[#888888]">
+          <p>© 2026 Route136. Made with care by <strong className="text-[#171717] dark:text-[#ededed] font-medium">Khan Abdullah</strong></p>
         </div>
       </footer>
     </main>
@@ -5706,23 +5997,23 @@ export default function Home() {
 
       {/* 4. Search and Add Course Combobox Overlay */}
       {activeCourseSelectorSemesterId !== null && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#08080d]/98 border border-white/[0.1] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[85vh] text-[#171717] dark:text-[#ededed]">
             
             {/* Combobox Header */}
-            <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.01]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shrink-0 shadow-sm">
-                  {swappingCourseCode ? <ArrowRightLeft className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
+                <div className="h-9 w-9 rounded-lg bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
+                  {swappingCourseCode ? <ArrowRightLeft className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white tracking-tight">
+                  <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed] tracking-tight">
                     {swappingCourseCode ? `Swap Course: ${swappingCourseCode}` : "Add Course to Semester"}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5 font-normal">
+                  <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5 font-normal">
                     {swappingCourseCode 
-                      ? "Select a new course to swap into this slot" 
-                      : "Select a course to add to your semester timeline plan"}
+                      ? "Select a replacement course for this slot" 
+                      : "Select a course to add to your semester plan"}
                   </p>
                 </div>
               </div>
@@ -5732,20 +6023,20 @@ export default function Home() {
                   setSwappingCourseCode(null);
                   setCourseSearchQuery("");
                 }} 
-                className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Combobox Filter tabs and Search */}
-            <div className="p-5 bg-[#050508]/60 border-b border-white/[0.06] space-y-3.5">
+            <div className="p-4 bg-white dark:bg-[#0c0c0c] border-b border-[#ebebeb] dark:border-[#262626] space-y-3">
               <input
                 type="text"
-                placeholder="Search by code (e.g. CSE220) or name..."
+                placeholder="Search by code (e.g. CSE220) or title..."
                 value={courseSearchQuery}
                 onChange={(e) => setCourseSearchQuery(e.target.value)}
-                className="w-full bg-[#030305] border border-white/[0.1] text-xs px-4 py-2.5 rounded-2xl text-slate-100 outline-none focus:border-indigo-400 transition shadow-inner font-medium"
+                className="w-full bg-[#fafafa] dark:bg-[#141414] border border-[#e5e5e5] dark:border-[#262626] text-xs px-3.5 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] placeholder:text-[#888888] outline-none focus:border-[#171717] dark:focus:border-[#ededed] transition font-medium"
               />
 
               <div className="flex flex-wrap gap-1.5">
@@ -5753,10 +6044,10 @@ export default function Home() {
                   <button
                     key={filterTab}
                     onClick={() => setCourseSearchFilter(filterTab)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium border transition cursor-pointer ${
                       courseSearchFilter === filterTab
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-transparent text-white shadow-md shadow-blue-500/20'
-                        : 'bg-[#08080d] border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                        ? 'bg-[#171717] dark:bg-[#ededed] border-transparent text-white dark:text-[#0a0a0a] shadow-vercel-subtle'
+                        : 'bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
                     }`}
                   >
                     {filterTab}
@@ -5766,9 +6057,9 @@ export default function Home() {
             </div>
 
             {/* Search list results */}
-            <div className="flex-1 overflow-y-auto divide-y divide-white/[0.04] p-3 space-y-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto divide-y divide-[#f0f0f0] dark:divide-[#1a1a1a] p-2.5 space-y-1 custom-scrollbar">
               {filteredSearchCourses.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs italic">
+                <div className="py-8 text-center text-[#888888] text-xs">
                   No matching courses found.
                 </div>
               ) : (
@@ -5795,53 +6086,53 @@ export default function Home() {
                           handleAddCourseToSemester(activeCourseSelectorSemesterId, course.code);
                         }
                       }}
-                      className={`w-full p-3.5 text-left rounded-2xl transition flex items-center justify-between text-xs group ${
-                        isDisabled ? 'opacity-40 cursor-not-allowed bg-transparent' : 'cursor-pointer hover:bg-white/[0.04]'
+                      className={`w-full p-3 text-left rounded-xl transition flex items-center justify-between text-xs group ${
+                        isDisabled ? 'opacity-40 cursor-not-allowed bg-transparent' : 'cursor-pointer hover:bg-[#f5f5f5] dark:hover:bg-[#161616]'
                       }`}
                     >
                       <div className="flex-1 min-w-0 pr-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-mono font-black text-xs sm:text-sm px-2 py-0.5 rounded-lg border shadow-inner ${theme.codePill}`}>
+                          <span className={`font-mono font-semibold text-xs px-2 py-0.5 rounded-md border ${theme.codePill}`}>
                             {course.code}
                           </span>
-                          <span className="text-[10px] bg-white/[0.04] border border-white/[0.08] px-2 py-0.5 rounded-lg font-mono font-semibold text-slate-300">
-                            {course.credits} Credits
+                          <span className="text-[10px] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2 py-0.5 rounded-md font-mono font-medium text-[#666666] dark:text-[#a1a1a1]">
+                            {course.credits} Cr
                           </span>
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border select-none ${theme.badge}`}>
+                          <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
                             {theme.label}
                           </span>
                           {renderMandatoryBadge(course.code)}
                         </div>
-                        <p className="text-slate-300 text-xs mt-1 font-medium truncate">{course.title}</p>
+                        <p className="text-[#4d4d4d] dark:text-[#b4b4b4] text-xs mt-1 font-medium truncate">{course.title}</p>
                         {isBlockedDuplicate && (
-                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 font-semibold">
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                             <Info className="h-3 w-3 shrink-0" />
                             <span>Already added to this semester</span>
                           </div>
                         )}
                         {isLocked && (
-                          <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-400 font-semibold">
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-600 dark:text-rose-400 font-medium">
                             <AlertTriangle className="h-3 w-3 shrink-0" />
-                            <span>Cannot Add: Missing Hard Prerequisite ({missingHp.join(", ")})</span>
+                            <span>Missing Hard Prerequisite ({missingHp.join(", ")})</span>
                           </div>
                         )}
                       </div>
 
                       <div className="shrink-0">
                         {isBlockedDuplicate ? (
-                          <span className="text-[10px] font-semibold text-slate-400 bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-[#888888] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2.5 py-1 rounded-lg whitespace-nowrap">
                             In Semester
                           </span>
                         ) : isLocked ? (
-                          <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
                             Locked
                           </span>
                         ) : swappingCourseCode ? (
-                          <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 rounded-xl whitespace-nowrap flex items-center gap-1">
+                          <span className="text-[10px] font-medium text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2.5 py-1 rounded-lg whitespace-nowrap flex items-center gap-1">
                             <ArrowRightLeft className="h-3 w-3 shrink-0" /> Swap
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-xl whitespace-nowrap flex items-center gap-1">
+                          <span className="text-[10px] font-medium text-[#171717] dark:text-[#ededed] bg-[#f5f5f5] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2.5 py-1 rounded-lg whitespace-nowrap flex items-center gap-1">
                             <Plus className="h-3 w-3 shrink-0" /> Add
                           </span>
                         )}
@@ -5858,20 +6149,20 @@ export default function Home() {
 
       {/* 4.5. Category Course Selector Modal Overlay */}
       {activeCategorySelectorKey !== null && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#08080d]/98 border border-white/[0.1] rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg shadow-vercel-modal overflow-hidden flex flex-col max-h-[85vh] text-[#171717] dark:text-[#ededed]">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.01]">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shrink-0 shadow-sm">
-                  <BookOpen className="h-5 w-5" />
+                <div className="h-9 w-9 rounded-lg bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <BookOpen className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-white tracking-tight">
+                  <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed] tracking-tight">
                     Add to {categoryDetails.name}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5 font-normal">
+                  <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5 font-normal">
                     {categoryDetails.desc}
                   </p>
                 </div>
@@ -5882,20 +6173,20 @@ export default function Home() {
                   setSelectedCategoryCourseCode("");
                   setCategoryCourseSearchQuery("");
                 }} 
-                className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#ebebeb] dark:border-[#262626] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Target Semester Selector */}
-            <div className="p-5 bg-[#050508]/60 border-b border-white/[0.06] space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Select Target Semester:</label>
+            <div className="p-4 bg-white dark:bg-[#0c0c0c] border-b border-[#ebebeb] dark:border-[#262626] space-y-1.5">
+              <label className="text-[10px] font-mono font-medium text-[#666666] dark:text-[#888888] tracking-wider uppercase">Target Semester</label>
               <div className="relative">
                 <select
                   value={selectedCategoryTargetSemesterId}
                   onChange={(e) => setSelectedCategoryTargetSemesterId(e.target.value)}
-                  className="w-full appearance-none bg-[#030305] border border-white/[0.1] hover:border-white/[0.2] text-xs pl-4 pr-11 py-3 rounded-2xl text-slate-100 outline-none focus:border-indigo-400 transition cursor-pointer shadow-inner font-semibold"
+                  className="w-full appearance-none bg-[#fafafa] dark:bg-[#141414] border border-[#e5e5e5] dark:border-[#262626] hover:border-[#cccccc] dark:hover:border-[#333333] text-xs pl-3.5 pr-10 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] outline-none focus:border-[#171717] dark:focus:border-[#ededed] transition cursor-pointer font-medium"
                 >
                   {semesters.map((sem, semIdx) => {
                     const intake = semesterIntakes[semIdx];
@@ -5908,31 +6199,31 @@ export default function Home() {
                     );
                   })}
                 </select>
-                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
+                <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#888888] flex items-center">
                   <ChevronDown className="h-4 w-4" />
                 </div>
               </div>
             </div>
 
             {/* Course Search Input */}
-            <div className="p-5 bg-[#050508]/60 border-b border-white/[0.06] space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Select Course to Add:</label>
+            <div className="p-4 bg-white dark:bg-[#0c0c0c] border-b border-[#ebebeb] dark:border-[#262626] space-y-1.5">
+              <label className="text-[10px] font-mono font-medium text-[#666666] dark:text-[#888888] tracking-wider uppercase">Filter Courses</label>
               <input
                 type="text"
                 placeholder="Search course by code or title..."
                 value={categoryCourseSearchQuery}
                 onChange={(e) => setCategoryCourseSearchQuery(e.target.value)}
-                className="w-full bg-[#030305] border border-white/[0.1] text-xs px-4 py-2.5 rounded-2xl text-slate-100 outline-none focus:border-indigo-400 transition shadow-inner font-medium"
+                className="w-full bg-[#fafafa] dark:bg-[#141414] border border-[#e5e5e5] dark:border-[#262626] text-xs px-3.5 py-2.5 rounded-lg text-[#171717] dark:text-[#ededed] placeholder:text-[#888888] outline-none focus:border-[#171717] dark:focus:border-[#ededed] transition font-medium"
               />
             </div>
 
             {/* Filtered Courses List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-white/[0.04] p-3 space-y-1 bg-[#050508]/40 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto divide-y divide-[#f0f0f0] dark:divide-[#1a1a1a] p-2.5 space-y-1 custom-scrollbar">
               {categoryFilteredCourses.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs italic">
+                <div className="py-8 text-center text-[#888888] text-xs">
                   {categoryCourseSearchQuery.trim() !== "" 
                     ? "No matching courses found."
-                    : "All courses in this category have already been planned or completed!"}
+                    : "All courses in this category have already been planned or completed."}
                 </div>
               ) : (
                 categoryFilteredCourses.map(course => {
@@ -5957,62 +6248,62 @@ export default function Home() {
                       type="button"
                       disabled={isDisabled}
                       onClick={() => !isDisabled && setSelectedCategoryCourseCode(course.code)}
-                      className={`w-full p-3.5 text-left rounded-2xl border transition flex items-center justify-between text-xs group ${
+                      className={`w-full p-3 text-left rounded-xl border transition flex items-center justify-between text-xs group ${
                         isDisabled 
                           ? 'opacity-40 cursor-not-allowed border-transparent bg-transparent' 
                           : isSelected
-                            ? 'bg-indigo-600/15 border-indigo-500/80 text-white shadow-md'
-                            : 'bg-transparent border-transparent text-slate-400 hover:text-slate-100 hover:bg-white/[0.04] cursor-pointer'
+                            ? 'bg-[#0070f3]/10 border-[#0070f3]/50 text-[#171717] dark:text-[#ededed]'
+                            : 'bg-transparent border-transparent text-[#666666] dark:text-[#a1a1a1] hover:text-[#171717] dark:hover:text-[#ededed] hover:bg-[#f5f5f5] dark:hover:bg-[#161616] cursor-pointer'
                       }`}
                     >
                       <div className="flex-1 min-w-0 pr-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`font-mono font-black text-xs sm:text-sm px-2 py-0.5 rounded-lg border shadow-inner ${theme.codePill}`}>
+                          <span className={`font-mono font-semibold text-xs px-2 py-0.5 rounded-md border ${theme.codePill}`}>
                             {course.code}
                           </span>
-                          <span className="text-[10px] bg-white/[0.04] border border-white/[0.08] px-2 py-0.5 rounded-lg font-mono font-semibold text-slate-300">
-                            {course.credits} Credits
+                          <span className="text-[10px] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2 py-0.5 rounded-md font-mono font-medium text-[#666666] dark:text-[#a1a1a1]">
+                            {course.credits} Cr
                           </span>
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border select-none ${theme.badge}`}>
+                          <span className={`text-[9px] font-medium px-2 py-0.5 rounded-md border select-none ${theme.badge}`}>
                             {theme.label}
                           </span>
                           {renderMandatoryBadge(course.code)}
                           {isCompleted && (
-                            <span className="text-[10px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                            <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-medium">
                               Completed {compState.grade && `(${compState.grade})`}
                             </span>
                           )}
                         </div>
-                        <p className="text-slate-300 text-xs mt-1 font-medium truncate">{course.title}</p>
+                        <p className="text-[#4d4d4d] dark:text-[#b4b4b4] text-xs mt-1 font-medium truncate">{course.title}</p>
                         {isAlreadyInSem && (
-                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 font-semibold">
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                             <Info className="h-3 w-3 shrink-0" />
                             <span>Already added to selected semester</span>
                           </div>
                         )}
                         {isLocked && (
-                          <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-400 font-semibold">
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-600 dark:text-rose-400 font-medium">
                             <AlertTriangle className="h-3 w-3 shrink-0" />
-                            <span>Cannot Add: Missing Hard Prerequisite ({missingHp.join(", ")})</span>
+                            <span>Missing Hard Prerequisite ({missingHp.join(", ")})</span>
                           </div>
                         )}
                       </div>
 
                       <div className="shrink-0">
                         {isAlreadyInSem ? (
-                          <span className="text-[10px] font-semibold text-slate-400 bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-[#888888] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#262626] px-2.5 py-1 rounded-lg whitespace-nowrap">
                             In Semester
                           </span>
                         ) : isLocked ? (
-                          <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
                             Locked
                           </span>
                         ) : isSelected ? (
-                          <span className="text-[10px] font-bold text-white bg-indigo-600 px-2.5 py-1 rounded-xl whitespace-nowrap flex items-center gap-1 shadow-sm">
+                          <span className="text-[10px] font-medium text-white bg-[#0070f3] px-2.5 py-1 rounded-lg whitespace-nowrap flex items-center gap-1">
                             <Check className="h-3 w-3 shrink-0" /> Selected
                           </span>
                         ) : (
-                          <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-xl whitespace-nowrap">
+                          <span className="text-[10px] font-medium text-[#171717] dark:text-[#ededed] bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2.5 py-1 rounded-lg whitespace-nowrap">
                             Select
                           </span>
                         )}
@@ -6024,7 +6315,7 @@ export default function Home() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-5 border-t border-white/[0.08] flex gap-3 bg-[#050508]/60">
+            <div className="p-4 border-t border-[#ebebeb] dark:border-[#262626] flex gap-2.5 bg-[#fafafa] dark:bg-[#111111]">
               <button
                 type="button"
                 onClick={() => {
@@ -6032,7 +6323,7 @@ export default function Home() {
                   setSelectedCategoryCourseCode("");
                   setCategoryCourseSearchQuery("");
                 }}
-                className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-200 text-xs font-bold rounded-2xl transition cursor-pointer"
+                className="flex-1 h-9 bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -6040,7 +6331,7 @@ export default function Home() {
                 type="button"
                 disabled={!selectedCategoryCourseCode || (selectedCategoryTargetSemesterId ? semesters.find(s => s.id === selectedCategoryTargetSemesterId)?.courses.some(c => c.code === selectedCategoryCourseCode) : false)}
                 onClick={handleAddCategoryCourse}
-                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition cursor-pointer"
+                className="flex-1 h-9 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
               >
                 Add Course
               </button>
@@ -6052,32 +6343,32 @@ export default function Home() {
 
       {/* 5. Reset Confirmation Modal overlay */}
       {showResetConfirm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#08080d]/95 border border-slate-700/80 rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <div className="flex items-center gap-3 text-rose-400">
-              <div className="h-10 w-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-400">
-                <AlertTriangle className="h-5 w-5" />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-sm shadow-vercel-modal p-5 sm:p-6 space-y-4 text-[#171717] dark:text-[#ededed]">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-rose-500/10 border border-rose-500/25 flex items-center justify-center shrink-0 text-rose-600 dark:text-rose-400">
+                <AlertTriangle className="h-4.5 w-4.5" />
               </div>
               <div>
-                <h3 className="font-extrabold text-base text-white">Reset Planner</h3>
-                <p className="text-[11px] text-rose-300">Irreversible Action</p>
+                <h3 className="font-semibold text-sm sm:text-base text-[#171717] dark:text-[#ededed]">Reset Planner</h3>
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 font-mono">Irreversible Action</p>
               </div>
             </div>
             
-            <p className="text-xs text-slate-300 leading-relaxed">
-              This action will completely wipe out your course schedule, grades, and Capstone thesis records.
+            <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
+              This action will permanently clear your course schedule, logged grades, and Capstone thesis records.
             </p>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="flex-1 py-2.5 bg-[#050508] hover:bg-[#0e0e14] border border-slate-800 text-slate-200 text-xs font-bold rounded-2xl transition cursor-pointer"
+                className="flex-1 h-9 bg-[#fafafa] dark:bg-[#161616] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleResetData}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-2xl shadow-lg shadow-rose-600/30 transition duration-200 cursor-pointer"
+                className="flex-1 h-9 bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
               >
                 Wipe Data
               </button>
@@ -6089,35 +6380,35 @@ export default function Home() {
 
       {/* 5. Grade Sheet Preview Modal */}
       {showGradeSheetModal && isMounted && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:backdrop-none no-print-backdrop">
-          <div className="bg-[#08080d]/98 border border-white/10 rounded-3xl max-w-4xl w-full p-4 sm:p-6 text-slate-100 shadow-2xl relative flex flex-col max-h-[94vh] overflow-hidden backdrop-blur-xl transition print:max-h-none print:border-none print:shadow-none print:w-full print:p-0 print:bg-transparent print-only-container">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-transparent print:backdrop-none no-print-backdrop">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl max-w-4xl w-full p-4 sm:p-6 text-[#171717] dark:text-[#ededed] shadow-vercel-modal relative flex flex-col max-h-[94vh] overflow-hidden transition print:max-h-none print:border-none print:shadow-none print:w-full print:p-0 print:bg-transparent print-only-container">
             
             {/* Modal Action Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-white/[0.08] no-print">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-[#ebebeb] dark:border-[#262626] no-print">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0">
-                  <Camera className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                <div className="h-9 w-9 rounded-lg border border-[#e5e5e5] dark:border-[#2a2a2a] bg-[#f5f5f5] dark:bg-[#181818] flex items-center justify-center text-[#171717] dark:text-[#ededed] shrink-0">
+                  <Camera className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black text-white">Academic Progress Snapshot Preview</h3>
-                  <p className="text-[10px] text-slate-400 font-medium">High-resolution exportable grade sheet</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed]">Academic Progress Snapshot Preview</h3>
+                  <p className="text-[11px] text-[#666666] dark:text-[#888888]">High-resolution exportable grade sheet</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2">
                 {/* Control 1: Download PNG Button */}
                 <button
                   onClick={handleGenerateGradeSheet}
                   disabled={isGeneratingSnapshot}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-500 hover:from-blue-500 hover:via-indigo-500 hover:to-indigo-400 text-white text-xs font-extrabold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl transition shadow-lg shadow-indigo-500/25 disabled:opacity-50 cursor-pointer active:scale-[0.98]"
+                  className="h-8 inline-flex items-center gap-2 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium px-3.5 rounded-lg transition shadow-vercel-subtle disabled:opacity-50 cursor-pointer active:scale-[0.98]"
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-3.5 w-3.5" />
                   <span>{isGeneratingSnapshot ? "Generating PNG..." : "Download PNG"}</span>
                 </button>
 
                 {/* Control 2: Close Button */}
                 <button
                   onClick={() => setShowGradeSheetModal(false)}
-                  className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer"
+                  className="w-8 h-8 rounded-lg bg-[#f5f5f5] dark:bg-[#181818] hover:bg-[#eaeaea] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
                   title="Close preview"
                 >
                   <X className="h-4 w-4" />
@@ -6160,7 +6451,7 @@ export default function Home() {
                       <Compass className="h-16 w-16 text-indigo-400" />
                     </div>
                     <span className="text-[85px] font-black tracking-tight text-white whitespace-nowrap">
-                      Flow136
+                      Route136
                     </span>
                   </div>
 
@@ -6172,7 +6463,7 @@ export default function Home() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h1 className="text-2xl font-black tracking-tight text-white">Flow136</h1>
+                          <h1 className="text-2xl font-black tracking-tight text-white">Route136</h1>
                           <span className="text-[10px] font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             CSE Curriculum
                           </span>
@@ -6422,11 +6713,11 @@ export default function Home() {
                   {/* Section 4: Footer Watermark (Z-Index 10) */}
                   <div className="border-t border-white/[0.08] mt-5 pt-3.5 relative z-10 flex items-center justify-between text-[11px] text-slate-400">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white font-bold">Flow136</span>
+                      <span className="text-white font-bold">Route136</span>
                       <span>&bull; Your curriculum, minus the complexity.</span>
                     </div>
                     <div className="font-mono text-[10px] text-indigo-400 font-semibold">
-                      flow136-cse-course-tracker.vercel.app
+                      route136-cse-course-tracker.vercel.app
                     </div>
                   </div>
                 </div> {/* End flow136-grade-sheet-export-node */}
@@ -6541,29 +6832,29 @@ export default function Home() {
           {
             stream: "Stream 2",
             title: "Math & Natural Sciences",
-            badge: "bg-purple-500/15 border-purple-500/30 text-purple-300",
-            pill: "bg-[#0e0e14] border-purple-500/25 text-purple-200 hover:border-purple-500/50",
+            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
+            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
             courses: ["BIO101","CHE101","ENV103","GSC110","MAT101","PHY101","STA101"]
           },
           {
             stream: "Stream 3",
             title: "Arts & Humanities",
-            badge: "bg-sky-500/15 border-sky-500/30 text-sky-300",
-            pill: "bg-[#0e0e14] border-sky-500/25 text-sky-200 hover:border-sky-500/50",
+            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
+            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
             courses: ["ENG110","ENG113","ENG114","ENG115","ENG333","HST102","HST103","HST104","HUM101","HUM102","HUM207","HUM210","HUM301"]
           },
           {
             stream: "Stream 4",
             title: "Social Sciences",
-            badge: "bg-teal-500/15 border-teal-500/30 text-teal-300",
-            pill: "bg-[#0e0e14] border-teal-500/25 text-teal-200 hover:border-teal-500/50",
+            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
+            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
             courses: ["ANT101","ANT342","ANT351","BUS102","BUS201","BUS333","BUS335","BU201","DEV104","DEV201","ECO101","ECO102","ECO105","POL101","POL102","POL103","POL201","POL202","POL203","POL210","PSY101","PSY102","SOC101","SOC201"]
           },
           {
             stream: "Stream 5",
             title: "Communities (CST)",
-            badge: "bg-rose-500/15 border-rose-500/30 text-rose-300",
-            pill: "bg-[#0e0e14] border-rose-500/25 text-rose-200 hover:border-rose-500/50",
+            badge: "bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]",
+            pill: "bg-[#fafafa] dark:bg-[#141414] border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] hover:border-[#0070f3]/50",
             courses: ["BUS334","CST201","CST204","CST301","CST302","CST303","CST304","CST305","CST306","CST307","CST308","CST309","CST310","CST314","CST333"]
           }
         ];
@@ -6580,45 +6871,42 @@ export default function Home() {
         const showGened = roadmapActiveTab === 'all' || roadmapActiveTab === 'gened';
 
         return (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
-            <div className="bg-[#08080d]/98 border border-white/[0.1] rounded-3xl max-w-[96vw] md:max-w-6xl w-full max-h-[94vh] flex flex-col shadow-2xl relative overflow-hidden backdrop-blur-xl text-xs md:text-sm">
-              {/* Ambient glows inside modal */}
-              <div className="absolute top-[-10%] left-[-10%] w-[35%] h-[35%] rounded-full bg-blue-500/10 blur-[90px] pointer-events-none" />
-              <div className="absolute bottom-[-10%] right-[-10%] w-[35%] h-[35%] rounded-full bg-indigo-500/10 blur-[90px] pointer-events-none" />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl max-w-[96vw] md:max-w-6xl w-full max-h-[94vh] flex flex-col shadow-vercel-modal relative overflow-hidden text-xs md:text-sm text-[#171717] dark:text-[#ededed]">
               
               {/* Header */}
-              <div className="px-4 sm:px-6 md:px-7 py-3.5 sm:py-4 border-b border-white/[0.08] flex items-center justify-between gap-3 relative z-10 shrink-0 bg-[#0e0e14]/50">
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between gap-3 relative z-10 shrink-0 bg-[#fafafa] dark:bg-[#111111]">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0">
-                    <Compass className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                  <div className="h-9 w-9 rounded-lg border border-[#e5e5e5] dark:border-[#2a2a2a] bg-white dark:bg-[#181818] flex items-center justify-center text-[#0070f3] shrink-0">
+                    <Compass className="h-4.5 w-4.5" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-tight truncate">
+                    <h3 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed] tracking-tight leading-tight truncate">
                       CSE Curriculum Roadmap &amp; Guide
                     </h3>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5 font-bold truncate">
+                    <p className="text-[11px] text-[#666666] dark:text-[#888888] font-mono mt-0.5 truncate">
                       FYAT Recommended 136-Credit Degree Distribution
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <a
                     href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-indigo-500/30 hover:border-indigo-400/50 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-md shadow-blue-500/20 active:scale-95 cursor-pointer whitespace-nowrap"
+                    className="h-8 inline-flex items-center gap-1.5 px-3 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] rounded-lg text-xs font-medium transition shadow-vercel-subtle active:scale-95 cursor-pointer whitespace-nowrap"
                     title="Open Sample OBE Curriculum (Version 2023)"
                   >
-                    <FileText className="h-3.5 w-3.5 text-blue-100" />
-                    <span>Sample OBE Curriculum (Version 2023)</span>
-                    <ExternalLink className="h-3 w-3 text-blue-100 opacity-80" />
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Sample OBE Curriculum</span>
+                    <ExternalLink className="h-3 w-3 opacity-80" />
                   </a>
                   <button 
                     onClick={() => {
                       setShowRoadmapModal(false);
                       setRoadmapSearch("");
                     }}
-                    className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer shrink-0"
+                    className="w-8 h-8 rounded-lg bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer shrink-0"
                     aria-label="Close"
                   >
                     <X className="h-4 w-4" />
@@ -6627,56 +6915,28 @@ export default function Home() {
               </div>
 
               {/* Segmented Filter Pills & Search Bar Strip */}
-              <div className="px-4 sm:px-6 md:px-7 py-2.5 sm:py-3 border-b border-white/[0.06] bg-[#050508]/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 relative z-10 shrink-0">
+              <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-b border-[#ebebeb] dark:border-[#262626] bg-white dark:bg-[#0c0c0c] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 relative z-10 shrink-0">
                 {/* Segmented Category Filter Pills */}
-                <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-[#0b0c14] border border-white/[0.08] rounded-2xl w-full sm:w-auto overflow-x-auto no-scrollbar">
-                  <button
-                    type="button"
-                    onClick={() => setRoadmapActiveTab('all')}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                      roadmapActiveTab === 'all'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    All Modules (45)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRoadmapActiveTab('dept')}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      roadmapActiveTab === 'dept'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-blue-400 shrink-0" />
-                    <span>Dept Core (25+2)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRoadmapActiveTab('outside')}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      roadmapActiveTab === 'outside'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-cyan-400 shrink-0" />
-                    <span>Outside Dept</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRoadmapActiveTab('gened')}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      roadmapActiveTab === 'gened'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-rose-400 shrink-0" />
-                    <span>GenEd Streams</span>
-                  </button>
+                <div className="flex items-center gap-1 p-1 bg-[#f5f5f5] dark:bg-[#141414] border border-[#ebebeb] dark:border-[#262626] rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'all', label: 'All Modules (45)' },
+                    { id: 'dept', label: 'Dept Core (25+2)' },
+                    { id: 'outside', label: 'Outside Dept' },
+                    { id: 'gened', label: 'GenEd Streams' }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setRoadmapActiveTab(tab.id as any)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                        roadmapActiveTab === tab.id
+                          ? 'bg-white dark:bg-[#242424] text-[#171717] dark:text-[#ededed] shadow-vercel-subtle'
+                          : 'text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Instant Search Bar */}
@@ -6686,13 +6946,13 @@ export default function Home() {
                     placeholder="Search course code or title..."
                     value={roadmapSearch}
                     onChange={(e) => setRoadmapSearch(e.target.value)}
-                    className="w-full bg-[#08080d] border border-white/[0.1] hover:border-white/[0.2] text-xs pl-8 pr-7 py-2 rounded-xl text-slate-100 placeholder:text-slate-500 outline-none focus:border-indigo-400 transition shadow-inner font-medium"
+                    className="w-full bg-[#fafafa] dark:bg-[#141414] border border-[#e5e5e5] dark:border-[#262626] text-xs pl-8 pr-7 py-1.5 rounded-lg text-[#171717] dark:text-[#ededed] placeholder:text-[#888888] outline-none focus:border-[#171717] dark:focus:border-[#ededed] transition font-medium"
                   />
-                  <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Search className="h-3.5 w-3.5 text-[#888888] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   {roadmapSearch && (
                     <button
                       onClick={() => setRoadmapSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed]"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -6701,112 +6961,73 @@ export default function Home() {
               </div>
 
               {/* Scrollable Modal Content */}
-              <div className="flex-grow overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 relative z-10 custom-scrollbar space-y-5 sm:space-y-6">
+              <div className="flex-grow overflow-y-auto overflow-x-hidden p-4 sm:p-6 relative z-10 custom-scrollbar space-y-6">
                 
                 {/* Stats Summary Bar */}
-                <div className="bg-[#0c0c14]/70 border border-white/[0.07] rounded-2xl p-3 sm:p-4 space-y-3 shadow-md">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 border-b border-white/[0.06] pb-2.5 sm:pb-3">
+                <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-[#ebebeb] dark:border-[#222222] pb-2.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-black text-white uppercase tracking-wider">
+                      <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed] uppercase tracking-wider">
                         CSE Curriculum Breakdown
                       </span>
-                      <span className="text-[10px] bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2.5 py-0.5 rounded-full font-bold">
+                      <span className="text-[10px] font-mono bg-[#0070f3]/10 border border-[#0070f3]/25 text-[#0070f3] px-2 py-0.5 rounded-full font-medium">
                         136 Credits Total
                       </span>
                     </div>
-                    <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
-                      132 Academic + 4 Non-Academic Credits &bull; 45 Total Courses
+                    <span className="text-[11px] font-mono text-[#666666] dark:text-[#888888]">
+                      132 Academic + 4 Non-Academic Credits • 45 Total Courses
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                        <span>Dept Core</span>
+                    {[
+                      { label: "Dept Core", count: "25 Courses", cr: "75 Credits" },
+                      { label: "Electives", count: "2 Courses", cr: "6 Credits" },
+                      { label: "Capstone", count: "1 Course", cr: "4 Credits" },
+                      { label: "MNS", count: "7 Courses", cr: "21 Credits" },
+                      { label: "GenEd", count: "5 Courses", cr: "15 Credits" },
+                      { label: "TARC (RS)", count: "3 Courses", cr: "9 Credits" },
+                      { label: "BIL (English)", count: "2 Courses", cr: "6 Credits" },
+                    ].map((stat, idx) => (
+                      <div key={stat.label} className={`${idx === 6 ? "col-span-2 sm:col-span-1" : ""} p-2.5 rounded-lg bg-white dark:bg-[#161616] border border-[#ebebeb] dark:border-[#242424] flex flex-col items-center text-center`}>
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-[#666666] dark:text-[#888888]">
+                          {stat.label}
+                        </span>
+                        <span className="text-xs font-semibold text-[#171717] dark:text-[#ededed] mt-1">{stat.count}</span>
+                        <span className="text-[10px] text-[#888888] font-mono">{stat.cr}</span>
                       </div>
-                      <span className="text-xs font-black text-white mt-1">25 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">75 Credits</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                        <span>Electives</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">2 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">6 Credits</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-purple-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-                        <span>Capstone</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">1 Course</span>
-                      <span className="text-[10px] text-slate-500 font-mono">4 Credits</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-                        <span>MNS</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">7 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">21 Credits</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-rose-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                        <span>GenEd</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">5 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">15 Credits</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
-                        <span>TARC (RS)</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">3 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">9 Credits</span>
-                    </div>
-                    <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-[#050508] border border-white/[0.06] flex flex-col items-center text-center">
-                      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-sky-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                        <span>BIL (English)</span>
-                      </div>
-                      <span className="text-xs font-black text-white mt-1">2 Courses</span>
-                      <span className="text-[10px] text-slate-500 font-mono">6 Credits</span>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Section 1: Department Core (Program Core + Capstone) */}
                 {showDept && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-black text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                        <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                           Program Core
                         </span>
-                        <h4 className="font-extrabold text-xs sm:text-sm text-white">25 Mandatory Computing Courses</h4>
+                        <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">25 Mandatory Computing Courses</h4>
                       </div>
-                      <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">75 Credits Total</span>
+                      <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">75 Credits Total</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {filteredDeptCore.map((c) => (
                         <div 
                           key={c.code}
-                          className="p-3 rounded-2xl bg-[#07070c] border border-white/[0.07] hover:border-blue-500/40 hover:bg-[#0c0c16] transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                          className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all flex items-center justify-between gap-2.5"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="font-mono font-black text-xs text-blue-300 bg-blue-950/40 border border-blue-500/30 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
                               {c.code}
                             </span>
-                            <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                            <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
                               {c.title}
                             </span>
                           </div>
-                          <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-md shrink-0">
+                          <span className="text-[10px] font-mono text-[#888888] shrink-0">
                             {c.credits} Cr
                           </span>
                         </div>
@@ -6815,31 +7036,31 @@ export default function Home() {
 
                     {/* Capstone */}
                     <div className="pt-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-black text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             Capstone
                           </span>
-                          <h4 className="font-extrabold text-xs sm:text-sm text-white">Graduation Milestone</h4>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">Graduation Milestone</h4>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">4 Credits</span>
+                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">4 Credits</span>
                       </div>
 
-                      <div className="mt-2.5">
+                      <div className="mt-2">
                         {filteredCapstone.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3.5 rounded-2xl bg-[#090712] border border-purple-500/30 hover:border-purple-500/60 transition-all flex items-center justify-between gap-3 group shadow-sm"
+                            className="p-3 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-3"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-black text-xs text-purple-300 bg-purple-950/60 border border-purple-500/40 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                              <span className="font-mono font-semibold text-xs text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs font-bold text-slate-100 group-hover:text-white truncate">
+                              <span className="text-xs font-medium text-[#171717] dark:text-[#ededed] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[11px] font-mono font-bold text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2 py-0.5 rounded-md shrink-0">
+                            <span className="text-[11px] font-mono text-[#666666] dark:text-[#888888] shrink-0">
                               4 Credits
                             </span>
                           </div>
@@ -6848,34 +7069,34 @@ export default function Home() {
                     </div>
 
                     {/* CSE Major Electives */}
-                    <div className="pt-2 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="pt-2 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             CSE Major Electives
                           </span>
-                          <h4 className="font-extrabold text-xs sm:text-sm text-white">
-                            Select 2 Courses <span className="text-slate-400 font-normal text-[11px] sm:text-xs">(from 24 Available)</span>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                            Select 2 Courses <span className="text-[#888888] font-normal text-xs">(from 24 Available)</span>
                           </h4>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">6 Credits Required</span>
+                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">6 Credits Required</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {filteredElectives.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3 rounded-2xl bg-[#07070c] border border-white/[0.07] hover:border-amber-500/40 hover:bg-[#0c0c16] transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] hover:border-[#171717]/30 dark:hover:border-[#ededed]/30 transition-all flex items-center justify-between gap-2.5"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-black text-xs text-amber-300 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-md shrink-0">
+                            <span className="text-[10px] font-mono text-[#888888] shrink-0">
                               {c.credits} Cr
                             </span>
                           </div>
@@ -6889,40 +7110,40 @@ export default function Home() {
                 {showOutside && (
                   <div className="space-y-5">
                     {/* MNS Math & Natural Sciences */}
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-black text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             MNS
                           </span>
-                          <h4 className="font-extrabold text-xs sm:text-sm text-white">
-                            Mathematics &amp; Natural Sciences <span className="text-slate-400 font-normal text-[11px] sm:text-xs">(7 Courses)</span>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                            Mathematics &amp; Natural Sciences <span className="text-[#888888] font-normal text-xs">(7 Courses)</span>
                           </h4>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">21 Academic Credits</span>
+                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">21 Academic Credits</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {filteredMns.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3 rounded-2xl bg-[#07070c] border border-white/[0.07] hover:border-cyan-500/40 hover:bg-[#0c0c16] transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-black text-xs text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
                                 {c.title}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {c.isRemedial && (
-                                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded-md uppercase">
+                                <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded uppercase">
                                   Non-Credit
                                 </span>
                               )}
-                              <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-md">
+                              <span className="text-[10px] font-mono text-[#888888]">
                                 {c.credits} Cr
                               </span>
                             </div>
@@ -6932,40 +7153,40 @@ export default function Home() {
                     </div>
 
                     {/* BIL Languages */}
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-black text-sky-300 bg-sky-500/15 border border-sky-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             BIL
                           </span>
-                          <h4 className="font-extrabold text-xs sm:text-sm text-white">
-                            Brac Institute of Languages <span className="text-slate-400 font-normal text-[11px] sm:text-xs">(2 Courses Needed)</span>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                            Brac Institute of Languages <span className="text-[#888888] font-normal text-xs">(2 Courses Needed)</span>
                           </h4>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">6 Academic Credits</span>
+                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">6 Academic Credits</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {filteredBil.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3 rounded-2xl bg-[#07070c] border border-white/[0.07] hover:border-sky-500/40 hover:bg-[#0c0c16] transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-black text-xs text-sky-300 bg-sky-950/40 border border-sky-500/30 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
                                 {c.title}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               {c.isRemedial && (
-                                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded-md uppercase">
+                                <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded uppercase">
                                   Non-Credit
                                 </span>
                               )}
-                              <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-md">
+                              <span className="text-[10px] font-mono text-[#888888]">
                                 {c.credits} Cr
                               </span>
                             </div>
@@ -6975,34 +7196,34 @@ export default function Home() {
                     </div>
 
                     {/* TARC Residential Semester */}
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[11px] font-black text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                          <span className="text-[10px] font-mono font-semibold text-[#0070f3] bg-[#0070f3]/10 border border-[#0070f3]/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                             TARC (RS)
                           </span>
-                          <h4 className="font-extrabold text-xs sm:text-sm text-white">
-                            Residential Semester <span className="text-slate-400 font-normal text-[11px] sm:text-xs">(3 Courses Mandatory)</span>
+                          <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                            Residential Semester <span className="text-[#888888] font-normal text-xs">(3 Courses Mandatory)</span>
                           </h4>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">9 Academic Credits</span>
+                        <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">9 Academic Credits</span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {filteredTarc.map((c) => (
                           <div 
                             key={c.code}
-                            className="p-3 rounded-2xl bg-[#07070c] border border-white/[0.07] hover:border-indigo-500/40 hover:bg-[#0c0c16] transition-all flex items-center justify-between gap-2.5 group shadow-sm"
+                            className="p-2.5 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-2.5"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="font-mono font-black text-xs text-indigo-300 bg-indigo-950/40 border border-indigo-500/30 px-2 py-0.5 rounded-lg shadow-inner shrink-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded shrink-0">
                                 {c.code}
                               </span>
-                              <span className="text-xs font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                              <span className="text-xs text-[#4d4d4d] dark:text-[#b4b4b4] truncate">
                                 {c.title}
                               </span>
                             </div>
-                            <span className="text-[10px] font-mono text-slate-400 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-md shrink-0">
+                            <span className="text-[10px] font-mono text-[#888888] shrink-0">
                               {c.credits} Cr
                             </span>
                           </div>
@@ -7015,32 +7236,32 @@ export default function Home() {
                 {/* Section 3: COD GenEd Electives */}
                 {showGened && (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2.5 border-b border-white/[0.06]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 pb-2 border-b border-[#ebebeb] dark:border-[#242424]">
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        <span className="text-[11px] font-black text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2.5 py-0.5 rounded-lg uppercase tracking-wider shrink-0">
+                        <span className="text-[10px] font-mono font-semibold text-[#171717] dark:text-[#ededed] bg-[#f0f0f0] dark:bg-[#1a1a1a] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
                           COD
                         </span>
-                        <h4 className="font-extrabold text-xs sm:text-sm text-white">
-                          General Education Streams <span className="text-slate-400 font-normal text-[11px] sm:text-xs">(5 Courses Required)</span>
+                        <h4 className="font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
+                          General Education Streams <span className="text-[#888888] font-normal text-xs">(5 Courses Required)</span>
                         </h4>
                       </div>
-                      <span className="text-[11px] sm:text-xs text-slate-400 font-mono font-semibold shrink-0">15 Academic Credits</span>
+                      <span className="text-xs text-[#666666] dark:text-[#888888] font-mono shrink-0">15 Academic Credits</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {GENED_STREAMS.map((st) => (
                         <div 
                           key={st.stream}
-                          className="p-4 rounded-2xl bg-[#07070c] border border-white/[0.07] space-y-3"
+                          className="p-4 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] space-y-3"
                         >
-                          <div className="flex items-center justify-between gap-2 border-b border-white/[0.05] pb-2.5">
+                          <div className="flex items-center justify-between gap-2 border-b border-[#ebebeb] dark:border-[#222222] pb-2">
                             <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-lg border ${st.badge}`}>
+                              <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${st.badge}`}>
                                 {st.stream}
                               </span>
-                              <h5 className="font-bold text-xs text-white">{st.title}</h5>
+                              <h5 className="font-semibold text-xs text-[#171717] dark:text-[#ededed]">{st.title}</h5>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-mono">
+                            <span className="text-[10px] text-[#888888] font-mono">
                               {st.courses.length} options
                             </span>
                           </div>
@@ -7053,9 +7274,9 @@ export default function Home() {
                                 <span
                                   key={code}
                                   title={detail ? `${code}: ${detail.title} (${detail.credits} Cr)` : code}
-                                  className={`font-mono text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-help select-none ${
+                                  className={`font-mono text-[10px] font-medium px-2 py-1 rounded border transition-all cursor-help select-none ${
                                     isHighlight
-                                      ? 'bg-amber-500/20 border-amber-400 text-amber-200 scale-105 shadow-sm'
+                                      ? 'bg-[#0070f3]/15 border-[#0070f3] text-[#0070f3] font-semibold'
                                       : st.pill
                                   }`}
                                 >
@@ -7071,15 +7292,15 @@ export default function Home() {
                 )}
 
                 {/* External Official Resources Banners */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                  <div className="bg-[#0e0e14]/60 border border-white/[0.08] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
                     <div className="flex items-center gap-3">
-                      <span className="h-2.5 w-2.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
+                      <span className="h-2 w-2 rounded-full bg-[#0070f3] shrink-0" />
                       <div>
-                        <p className="text-xs text-slate-100 font-bold">
+                        <p className="text-xs text-[#171717] dark:text-[#ededed] font-semibold">
                           Sample OBE Curriculum (Version 2023)
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-[#666666] dark:text-[#888888] mt-0.5">
                           View the official degree pathway, course distributions &amp; structure.
                         </p>
                       </div>
@@ -7088,22 +7309,22 @@ export default function Home() {
                       href="https://docs.google.com/document/d/1_gvpl646PurM3Cl_JoxaXt0mvQx_6-Qc"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/20 active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                      className="h-8 inline-flex items-center justify-center gap-1.5 px-3 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg transition shadow-vercel-subtle active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                     >
-                      <span>Sample OBE Curriculum (Version 2023)</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>Open Document</span>
+                      <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
 
-                  <div className="bg-[#0e0e14]/60 border border-white/[0.08] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                  <div className="bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
                     <div className="flex items-center gap-3">
-                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+                      <span className="h-2 w-2 rounded-full bg-[#888888] shrink-0" />
                       <div>
-                        <p className="text-xs text-slate-100 font-bold">
+                        <p className="text-xs text-[#171717] dark:text-[#ededed] font-semibold">
                           Need clarification on GenEd stream rules?
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Check prerequisites and eligible courses directly on university website.
+                        <p className="text-[11px] text-[#666666] dark:text-[#888888] mt-0.5">
+                          Check prerequisites and eligible courses on the university portal.
                         </p>
                       </div>
                     </div>
@@ -7111,56 +7332,23 @@ export default function Home() {
                       href="https://www.bracu.ac.bd/avilable-program/general-education-gened"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 hover:text-white text-xs font-bold rounded-xl transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                      className="h-8 inline-flex items-center justify-center gap-1.5 px-3 bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                     >
-                      <span>Official GenEd Guidelines</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
+                      <span>GenEd Portal</span>
+                      <ArrowRight className="h-3 w-3" />
                     </a>
                   </div>
                 </div>
 
               </div>
 
-              {/* Modal Footer with Attribution & Category Guide */}
-              <div className="px-4 sm:px-6 py-3 border-t border-white/[0.08] bg-[#050508] flex flex-col md:flex-row items-center justify-between gap-3 text-[10px] text-slate-400 shrink-0 relative z-10 text-center md:text-left">
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-3">
-                  <span className="font-black uppercase tracking-wider text-indigo-400 shrink-0">
-                    Category Guide:
-                  </span>
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 sm:gap-2.5">
-                    <span className="font-bold text-blue-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                      Program Core
-                    </span>
-                    <span className="font-bold text-amber-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      Electives
-                    </span>
-                    <span className="font-bold text-purple-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                      Capstone
-                    </span>
-                    <span className="font-bold text-cyan-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-                      MNS
-                    </span>
-                    <span className="font-bold text-sky-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-                      BIL
-                    </span>
-                    <span className="font-bold text-indigo-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-                      RS
-                    </span>
-                    <span className="font-bold text-rose-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                      GenEd
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-slate-400 text-center md:text-right text-[10px]">
-                  Curriculum Guideline by <strong className="text-slate-200">Badhon Nandi</strong> (FYAT Mentor), OAA Brac University
+              {/* Modal Footer with Attribution */}
+              <div className="px-4 sm:px-6 py-3 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] text-[#666666] dark:text-[#888888] shrink-0 relative z-10 text-center md:text-left">
+                <span className="font-mono">
+                  136 Cr Total = 75 Core + 6 Electives + 4 Thesis + 21 MNS + 15 GenEd + 9 RS + 6 BIL
+                </span>
+                <div>
+                  Curriculum Guideline by <strong className="text-[#171717] dark:text-[#ededed] font-medium">Badhon Nandi</strong> (FYAT Mentor), OAA Brac University
                 </div>
               </div>
 
@@ -7171,17 +7359,17 @@ export default function Home() {
 
       {/* Repeat ROI Analyzer Dedicated Popup Modal */}
       {showRoiModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6">
-          <div className="bg-[#08080d]/98 border border-slate-700/80 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-6">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-2xl overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150 text-[#171717] dark:text-[#ededed]">
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#0e0e14]/40">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0">
-                  <Repeat className="h-5 w-5" />
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Repeat className="h-4.5 w-4.5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white tracking-tight">Repeat ROI Analyzer</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Simulate grade improvements, retake scenarios &amp; CGPA impact</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed] tracking-tight">Repeat ROI Analyzer</h3>
+                  <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5">Simulate grade improvements, retake scenarios &amp; CGPA impact</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -7189,15 +7377,15 @@ export default function Home() {
                   type="button"
                   onClick={() => setShowGradingSystemModal(true)}
                   title="View Official University Grading Scale"
-                  className="text-indigo-300 hover:text-indigo-200 text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 px-3.5 py-2 rounded-2xl border border-indigo-500/30 flex items-center gap-1.5 transition cursor-pointer"
+                  className="h-8 text-[#171717] dark:text-[#ededed] text-xs font-medium bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] px-3 rounded-lg border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center gap-1.5 transition cursor-pointer shadow-vercel-subtle"
                 >
-                  <Award className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Grading System</span>
+                  <Award className="h-3.5 w-3.5 text-[#0070f3]" />
+                  <span className="hidden sm:inline">Grading Scale</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowRoiModal(false)}
-                  className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer"
+                  className="w-8 h-8 rounded-lg bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -7205,17 +7393,17 @@ export default function Home() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-4">
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-4">
               {/* Threshold Filter Bar */}
-              <div className="p-4 rounded-2xl bg-[#0e0e14]/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-semibold text-slate-300">
+                  <span className="text-xs font-medium text-[#4d4d4d] dark:text-[#a1a1a1]">
                     Detect courses with grade ≤
                   </span>
                   <select
                     value={roiThresholdGrade}
                     onChange={(e) => setRoiThresholdGrade(e.target.value)}
-                    className="text-xs font-bold bg-[#050508] text-indigo-300 border border-slate-700/80 rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-400 cursor-pointer shadow-inner"
+                    className="text-xs font-medium bg-white dark:bg-[#181818] text-[#171717] dark:text-[#ededed] border border-[#e5e5e5] dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#171717] dark:focus:border-[#ededed] cursor-pointer"
                   >
                     <option value="B-">B- (2.7) — Standard Policy</option>
                     <option value="B">B (3.0)</option>
@@ -7231,75 +7419,75 @@ export default function Home() {
                   </select>
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[10px] font-bold self-start sm:self-auto">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse shrink-0" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-[10px] font-mono font-medium self-start sm:self-auto">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
                   <span>F grades always included</span>
                 </div>
               </div>
 
               {/* Combined Multi-Course Simulation Banner */}
               {roiAnalysis.combinedSelectedCount > 0 ? (
-                <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
+                <div className={`p-4 rounded-xl border transition-all duration-200 ${
                   roiAnalysis.combinedDelta > 0
-                    ? 'bg-gradient-to-r from-emerald-950/30 to-[#0e0e14]/60 border-emerald-500/30 text-emerald-300'
+                    ? 'bg-emerald-500/5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
                     : roiAnalysis.combinedDelta < 0
-                      ? 'bg-gradient-to-r from-rose-950/30 to-[#0e0e14]/60 border-rose-500/30 text-rose-300'
-                      : 'bg-[#0e0e14]/60 border-slate-800 text-slate-300'
+                      ? 'bg-rose-500/5 border-rose-500/30 text-rose-700 dark:text-rose-300'
+                      : 'bg-[#fafafa] dark:bg-[#111111] border-[#ebebeb] dark:border-[#242424] text-[#4d4d4d] dark:text-[#a1a1a1]'
                 }`}>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 font-bold text-sm">
+                    <div className="flex items-center gap-2 font-semibold text-xs sm:text-sm text-[#171717] dark:text-[#ededed]">
                       {roiAnalysis.combinedDelta > 0 ? (
-                        <div className="h-6 w-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-                          <TrendingUp className="h-4 w-4" />
+                        <div className="h-6 w-6 rounded-md bg-emerald-500/15 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                          <TrendingUp className="h-3.5 w-3.5" />
                         </div>
                       ) : roiAnalysis.combinedDelta < 0 ? (
-                        <div className="h-6 w-6 rounded-lg bg-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
-                          <TrendingDown className="h-4 w-4" />
+                        <div className="h-6 w-6 rounded-md bg-rose-500/15 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                          <TrendingDown className="h-3.5 w-3.5" />
                         </div>
                       ) : (
-                        <div className="h-6 w-6 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
-                          <Target className="h-4 w-4" />
+                        <div className="h-6 w-6 rounded-md bg-[#eaeaea] dark:bg-[#222222] flex items-center justify-center text-[#888888] shrink-0">
+                          <Target className="h-3.5 w-3.5" />
                         </div>
                       )}
                       <span>
                         Combined Simulation ({roiAnalysis.combinedSelectedCount} course{roiAnalysis.combinedSelectedCount > 1 ? 's' : ''}, {roiAnalysis.combinedSelectedCredits} Cr)
                       </span>
                     </div>
-                    <span className={`text-xs font-black px-3 py-1 rounded-full border self-start sm:self-auto ${
+                    <span className={`text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full border self-start sm:self-auto ${
                       roiAnalysis.combinedDelta > 0
-                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                         : roiAnalysis.combinedDelta < 0
-                          ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
-                          : 'bg-slate-800 border-slate-700 text-slate-300'
+                          ? 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400'
+                          : 'bg-[#f0f0f0] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#666666] dark:text-[#999999]'
                     }`}>
                       {roiAnalysis.combinedDelta > 0 ? `+${roiAnalysis.combinedDelta.toFixed(3)}` : roiAnalysis.combinedDelta.toFixed(3)} CGPA
                     </span>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs pt-2 border-t border-white/5">
-                    <span className="text-slate-300">
-                      Current: <strong className="text-white font-mono">{roiAnalysis.currentCgpa.toFixed(2)}</strong> → Projected: <strong className={`font-mono ${
-                        roiAnalysis.combinedDelta > 0 ? 'text-emerald-300 font-bold' : roiAnalysis.combinedDelta < 0 ? 'text-rose-300 font-bold' : 'text-white'
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs pt-2 border-t border-black/5 dark:border-white/5">
+                    <span className="text-[#666666] dark:text-[#999999]">
+                      Current: <strong className="text-[#171717] dark:text-[#ededed] font-mono">{roiAnalysis.currentCgpa.toFixed(2)}</strong> → Projected: <strong className={`font-mono ${
+                        roiAnalysis.combinedDelta > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : roiAnalysis.combinedDelta < 0 ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-[#171717] dark:text-[#ededed]'
                       }`}>{roiAnalysis.combinedNewCgpa.toFixed(2)}</strong>
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-[#666666] dark:text-[#888888]">
                       {roiAnalysis.combinedDelta > 0
                         ? `Boosts CGPA by +${roiAnalysis.combinedDelta.toFixed(3)} points`
                         : roiAnalysis.combinedDelta < 0
-                          ? `⚠️ Warning: Lowers CGPA by ${Math.abs(roiAnalysis.combinedDelta).toFixed(3)} points`
+                          ? `Lowers CGPA by ${Math.abs(roiAnalysis.combinedDelta).toFixed(3)} points`
                           : 'No net change to overall CGPA'}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl border border-dashed border-slate-800/80 text-center text-xs text-slate-400 bg-[#0e0e14]/30">
+                <div className="p-3.5 rounded-xl border border-dashed border-[#e5e5e5] dark:border-[#262626] text-center text-xs text-[#666666] dark:text-[#888888] bg-[#fafafa] dark:bg-[#111111]">
                   Select one or more courses below using the checkboxes to calculate combined repeat impact.
                 </div>
               )}
 
               {/* Toolbar & Course Count */}
               <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-xs font-semibold text-slate-400">
+                <span className="text-xs font-mono text-[#666666] dark:text-[#888888]">
                   {roiAnalysis.candidates.length} course{roiAnalysis.candidates.length !== 1 ? 's' : ''} detected
                 </span>
 
@@ -7312,11 +7500,11 @@ export default function Home() {
                         roiAnalysis.candidates.forEach(c => { allSelected[c.code] = true; });
                         setSelectedRoiCourses(allSelected);
                       }}
-                      className="text-slate-400 hover:text-indigo-300 transition underline cursor-pointer"
+                      className="text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition underline cursor-pointer"
                     >
                       Select All
                     </button>
-                    <span className="text-slate-600">|</span>
+                    <span className="text-[#cccccc] dark:text-[#333333]">|</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -7324,16 +7512,16 @@ export default function Home() {
                         roiAnalysis.candidates.forEach(c => { allDeselected[c.code] = false; });
                         setSelectedRoiCourses(allDeselected);
                       }}
-                      className="text-slate-400 hover:text-indigo-300 transition underline cursor-pointer"
+                      className="text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition underline cursor-pointer"
                     >
                       Clear
                     </button>
-                    <span className="text-slate-600">|</span>
+                    <span className="text-[#cccccc] dark:text-[#333333]">|</span>
                     <button
                       type="button"
                       onClick={() => setRoiTargetGrades({})}
                       title="Reset all target repeat grades to 4.0 (A)"
-                      className="text-slate-400 hover:text-indigo-300 transition underline cursor-pointer"
+                      className="text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition underline cursor-pointer"
                     >
                       Reset Grades
                     </button>
@@ -7343,26 +7531,26 @@ export default function Home() {
 
               {/* Course Cards List */}
               {roiAnalysis.candidates.length === 0 ? (
-                <div className="p-8 rounded-3xl border border-slate-800/80 bg-[#0e0e14]/30 text-center space-y-3">
-                  <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
-                    <Check className="h-5 w-5" />
+                <div className="p-8 rounded-xl border border-[#ebebeb] dark:border-[#242424] bg-[#fafafa] dark:bg-[#111111] text-center space-y-3">
+                  <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mx-auto">
+                    <Check className="h-4.5 w-4.5" />
                   </div>
-                  <p className="text-xs text-slate-200 font-medium">
+                  <p className="text-xs text-[#171717] dark:text-[#ededed] font-semibold">
                     No courses found with grade ≤ {roiThresholdGrade} (or F).
                   </p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    You have no poor performing courses under this threshold. You can raise the threshold to include courses with higher grades.
+                  <p className="text-xs text-[#666666] dark:text-[#888888] max-w-sm mx-auto">
+                    You have no courses under this threshold. You can raise the threshold to inspect higher grades.
                   </p>
                   <button
                     type="button"
                     onClick={() => setRoiThresholdGrade('all')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold transition cursor-pointer"
+                    className="h-8 inline-flex items-center gap-1.5 px-3.5 bg-[#171717] dark:bg-[#ededed] text-white dark:text-[#0a0a0a] rounded-lg text-xs font-medium transition cursor-pointer shadow-vercel-subtle"
                   >
                     <span>Show All Gradable Courses (&lt; 4.0)</span>
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                   {roiAnalysis.candidates.map((item) => {
                     const isSelected = item.isSelected;
                     const isBoost = item.delta > 0;
@@ -7371,10 +7559,10 @@ export default function Home() {
                     return (
                       <div 
                         key={item.code} 
-                        className={`p-4 rounded-2xl border transition-all ${
+                        className={`p-3.5 rounded-xl border transition-all ${
                           isSelected 
-                            ? 'bg-[#12121c]/80 border-indigo-500/40 shadow-md' 
-                            : 'bg-[#0e0e14]/40 border-slate-800/60 opacity-80 hover:opacity-100 hover:bg-[#0e0e14]/70'
+                            ? 'bg-[#fafafa] dark:bg-[#141414] border-[#171717] dark:border-[#ededed] shadow-vercel-subtle' 
+                            : 'bg-white dark:bg-[#111111] border-[#ebebeb] dark:border-[#242424] hover:border-[#cccccc] dark:hover:border-[#333333]'
                         }`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
@@ -7388,48 +7576,48 @@ export default function Home() {
                                   [item.code]: !isSelected
                                 }));
                               }}
-                              className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all duration-200 cursor-pointer shrink-0 focus:outline-none ${
+                              className={`h-4.5 w-4.5 rounded border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline-none ${
                                 isSelected
-                                  ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-transparent shadow-[0_0_8px_rgba(99,102,241,0.5)]'
-                                  : 'border-white/20 bg-white/[0.03] hover:border-white/40'
+                                  ? 'bg-[#171717] dark:bg-[#ededed] border-transparent text-white dark:text-[#0a0a0a]'
+                                  : 'border-[#cccccc] dark:border-[#333333] bg-white dark:bg-[#181818]'
                               }`}
                               title="Include in combined repeat calculation"
                             >
                               {isSelected && (
-                                <Check className="h-3 w-3 text-white stroke-[3]" />
+                                <Check className="h-3 w-3 stroke-[3]" />
                               )}
                             </button>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="font-mono font-black text-sm text-white bg-[#060609] border border-slate-700/80 px-2 py-0.5 rounded-lg shadow-inner">{item.code}</span>
-                                <span className="text-[11px] text-slate-400 font-semibold font-mono">({item.credits} Cr)</span>
+                                <span className="font-mono font-semibold text-xs text-[#171717] dark:text-[#ededed] bg-[#f5f5f5] dark:bg-[#1c1c1c] border border-[#e5e5e5] dark:border-[#2a2a2a] px-2 py-0.5 rounded">{item.code}</span>
+                                <span className="text-[11px] text-[#666666] dark:text-[#888888] font-mono">({item.credits} Cr)</span>
                                 {item.isF && (
-                                  <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  <span className="text-[9px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25">
                                     F Failed
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-slate-300 truncate block max-w-xs sm:max-w-md mt-1 font-medium" title={item.title}>
+                              <span className="text-xs text-[#4d4d4d] dark:text-[#a1a1a1] truncate block max-w-xs sm:max-w-md mt-1 font-medium" title={item.title}>
                                 {item.title}
                               </span>
                             </div>
                           </div>
 
                           {/* Current Grade & Target Grade Dropdown */}
-                          <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                          <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
                             <div className="text-right">
-                              <span className="text-[9px] text-slate-400 block uppercase tracking-wider font-bold">Current</span>
-                              <span className={`text-xs font-black px-2.5 py-1 rounded-xl border inline-block ${
+                              <span className="text-[9px] text-[#888888] block uppercase tracking-wider font-mono">Current</span>
+                              <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-lg border inline-block ${
                                 item.isF 
-                                  ? 'bg-rose-950/40 border-rose-800/60 text-rose-300' 
-                                  : 'bg-[#050508] border-slate-700 text-slate-200'
+                                  ? 'bg-rose-500/10 border-rose-500/25 text-rose-600 dark:text-rose-400' 
+                                  : 'bg-[#f5f5f5] dark:bg-[#1a1a1a] border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed]'
                               }`}>
                                 {item.currentGrade} ({item.currentGp.toFixed(1)})
                               </span>
                             </div>
 
                             <div className="text-right">
-                              <span className="text-[9px] text-slate-400 block uppercase tracking-wider font-bold">Repeat As</span>
+                              <span className="text-[9px] text-[#888888] block uppercase tracking-wider font-mono">Repeat As</span>
                               <select
                                 value={item.targetGrade}
                                 onChange={(e) => {
@@ -7439,7 +7627,7 @@ export default function Home() {
                                     [item.code]: newG
                                   }));
                                 }}
-                                className="text-xs font-bold bg-[#050508] text-slate-100 border border-slate-700 hover:border-indigo-400 rounded-xl px-2.5 py-1 focus:outline-none focus:border-indigo-400 cursor-pointer shadow-inner"
+                                className="text-xs font-mono font-medium bg-white dark:bg-[#181818] text-[#171717] dark:text-[#ededed] border border-[#e5e5e5] dark:border-[#2a2a2a] rounded-lg px-2 py-1 focus:outline-none focus:border-[#171717] dark:focus:border-[#ededed] cursor-pointer"
                               >
                                 {Object.keys(GRADING_SCALE).map(g => (
                                   <option key={g} value={g}>
@@ -7452,27 +7640,27 @@ export default function Home() {
                         </div>
 
                         {/* Individual Course Impact Sub-bar */}
-                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/60 text-xs">
-                          <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between pt-2 border-t border-[#ebebeb] dark:border-[#222222] text-xs">
+                          <div className="flex items-center gap-1.5 font-mono">
                             {isBoost ? (
-                              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
                                 <TrendingUp className="h-3.5 w-3.5" />
                                 +{item.delta.toFixed(3)} CGPA Boost
                               </span>
                             ) : isDrop ? (
-                              <span className="text-rose-400 font-bold flex items-center gap-1">
+                              <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
                                 <TrendingDown className="h-3.5 w-3.5" />
                                 {item.delta.toFixed(3)} CGPA Drop
                               </span>
                             ) : (
-                              <span className="text-slate-400 font-semibold">
+                              <span className="text-[#888888]">
                                 ±0.000 CGPA (No Change)
                               </span>
                             )}
                           </div>
 
-                          <span className="text-slate-400 text-[11px]">
-                            Yields <strong className={isBoost ? 'text-emerald-300' : isDrop ? 'text-rose-300' : 'text-slate-200'}>{item.newCgpa.toFixed(2)} CGPA</strong>
+                          <span className="text-[#666666] dark:text-[#888888] text-[11px] font-mono">
+                            Yields <strong className={isBoost ? 'text-emerald-600 dark:text-emerald-400' : isDrop ? 'text-rose-600 dark:text-rose-400' : 'text-[#171717] dark:text-[#ededed]'}>{item.newCgpa.toFixed(2)} CGPA</strong>
                           </span>
                         </div>
                       </div>
@@ -7483,11 +7671,11 @@ export default function Home() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-5 border-t border-slate-800/80 bg-[#0e0e14]/30 flex justify-end">
+            <div className="p-4 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowRoiModal(false)}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-blue-600/25"
+                className="h-9 px-5 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg transition cursor-pointer shadow-vercel-subtle"
               >
                 Done
               </button>
@@ -7498,54 +7686,54 @@ export default function Home() {
 
       {/* Official Grading System Reference Modal */}
       {showGradingSystemModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#08080d]/98 border border-slate-700/80 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[90vh] text-[#171717] dark:text-[#ededed]">
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#0e0e14]/40">
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                  <Award className="h-5 w-5" />
+                <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3]">
+                  <Award className="h-4.5 w-4.5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white tracking-tight">Grading System</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">University standard grade points &amp; marks distribution</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed] tracking-tight">Grading System</h3>
+                  <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5">University standard grade points &amp; marks distribution</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowGradingSystemModal(false)}
-                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto custom-scrollbar space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                The grades at the university will be indicated in the following manner:
+            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4">
+              <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
+                Official BRAC University letter grades, grade points, and percentage mark equivalents:
               </p>
 
-              <div className="border border-slate-800/80 rounded-2xl overflow-hidden bg-[#0e0e14]/30">
+              <div className="border border-[#ebebeb] dark:border-[#242424] rounded-xl overflow-hidden bg-[#fafafa] dark:bg-[#111111]">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 bg-[#050508] text-[10px] uppercase font-bold text-slate-400">
-                      <th className="p-3">Marks Range</th>
-                      <th className="p-3 text-center">Grade</th>
-                      <th className="p-3 text-center">Grade Point</th>
-                      <th className="p-3">Remarks</th>
+                    <tr className="border-b border-[#ebebeb] dark:border-[#242424] bg-[#f5f5f5] dark:bg-[#161616] text-[10px] font-mono uppercase text-[#666666] dark:text-[#888888]">
+                      <th className="p-3 font-medium">Marks Range</th>
+                      <th className="p-3 text-center font-medium">Grade</th>
+                      <th className="p-3 text-center font-medium">Grade Point</th>
+                      <th className="p-3 font-medium">Remarks</th>
                     </tr>
                   </thead>
                   <tbody>
                     {GRADING_SYSTEM_INFO.map((row, idx) => (
                       <tr 
                         key={idx} 
-                        className="border-b border-slate-800/60 last:border-0 hover:bg-white/[0.02] transition"
+                        className="border-b border-[#ebebeb] dark:border-[#1f1f1f] last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
                       >
-                        <td className="p-3 font-mono text-[11px] text-slate-300">{row.marks}</td>
-                        <td className="p-3 font-bold text-center text-indigo-300">{row.grade}</td>
-                        <td className="p-3 font-mono font-semibold text-center text-slate-200">({row.points})</td>
-                        <td className="p-3 text-slate-400 font-medium">{row.remark || "—"}</td>
+                        <td className="p-3 font-mono text-[11px] text-[#4d4d4d] dark:text-[#b4b4b4]">{row.marks}</td>
+                        <td className="p-3 font-mono font-semibold text-center text-[#0070f3]">{row.grade}</td>
+                        <td className="p-3 font-mono font-medium text-center text-[#171717] dark:text-[#ededed]">({row.points})</td>
+                        <td className="p-3 text-[#666666] dark:text-[#888888]">{row.remark || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -7554,11 +7742,11 @@ export default function Home() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-5 border-t border-slate-800/80 bg-[#0e0e14]/30 flex justify-end">
+            <div className="p-4 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowGradingSystemModal(false)}
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition cursor-pointer"
+                className="h-9 px-5 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
               >
                 Close
               </button>
@@ -7569,18 +7757,21 @@ export default function Home() {
 
       {/* Cloud Sync & Auth Gatekeeper Modal */}
       {showCloudModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
-          <div className="bg-[#08080d]/98 border border-white/[0.1] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh] relative backdrop-blur-xl">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-lg overflow-hidden shadow-vercel-modal flex flex-col max-h-[92vh] relative text-[#171717] dark:text-[#ededed]">
             {/* Modal Header */}
-            <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#0e0e14]/50">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0">
-                  <Cloud className="h-5 w-5" />
+            <div className="p-4 sm:p-5 border-b border-[#ebebeb] dark:border-[#262626] flex items-center justify-between bg-[#fafafa] dark:bg-[#111111]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-lg bg-white dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
+                  <Cloud className="h-4.5 w-4.5" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-base font-black text-white tracking-tight flex items-center gap-2">
-                    <span>Google Drive Cloud Sync</span>
+                  <h3 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed] tracking-tight">
+                    Google Drive Cloud Sync
                   </h3>
+                  <p className="text-[11px] text-[#666666] dark:text-[#888888]">
+                    Encrypted private AppData backup
+                  </p>
                 </div>
               </div>
               <button
@@ -7589,22 +7780,22 @@ export default function Home() {
                   setShowCloudModal(false);
                   setGatekeeperError(null);
                 }}
-                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-lg bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#666666] dark:text-[#888888] hover:text-[#171717] dark:hover:text-[#ededed] transition cursor-pointer shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto custom-scrollbar space-y-4">
+            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4">
               {/* Gatekeeper Error Denial Alert */}
               {gatekeeperError && (
-                <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 space-y-1.5 animate-in fade-in duration-200">
-                  <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
-                    <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 space-y-1 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-semibold text-xs">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
                     <span>Access Blocked by Gatekeeper</span>
                   </div>
-                  <p className="text-[11px] text-rose-200/90 leading-relaxed font-medium">
+                  <p className="text-[11px] text-rose-600 dark:text-rose-300 leading-relaxed">
                     {gatekeeperError}
                   </p>
                 </div>
@@ -7618,10 +7809,10 @@ export default function Home() {
                     type="button"
                     disabled={isAuthenticating}
                     onClick={() => handleCloudSignIn()}
-                    className="w-full py-3.5 px-4 bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-xs rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg active:scale-[0.99] cursor-pointer disabled:opacity-60"
+                    className="w-full h-10 px-4 bg-[#171717] hover:bg-black/90 dark:bg-[#ededed] dark:hover:bg-white text-white dark:text-[#0a0a0a] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2.5 transition-all shadow-vercel-subtle active:scale-[0.99] cursor-pointer disabled:opacity-60"
                   >
                     {isAuthenticating ? (
-                      <RefreshCw className="h-4 w-4 animate-spin text-slate-700" />
+                      <RefreshCw className="h-4 w-4 animate-spin" />
                     ) : (
                       <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
@@ -7630,18 +7821,18 @@ export default function Home() {
                         <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                       </svg>
                     )}
-                    <span>{isAuthenticating ? "Connecting with Google..." : "Sign in (G-Suite)"}</span>
+                    <span>{isAuthenticating ? "Connecting with Google..." : "Sign in with BRACU G-Suite"}</span>
                   </button>
 
                   {/* Google OAuth Compliance Legal Notice */}
                   <div className="text-center pt-1 px-2">
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-normal">
-                      By continuing with Google, you agree to Flow136&apos;s{" "}
+                    <p className="text-[11px] text-[#666666] dark:text-[#888888] leading-relaxed">
+                      By continuing with Google, you agree to Route136&apos;s{" "}
                       <a
                         href="/terms"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 underline font-semibold transition"
+                        className="text-[#0070f3] hover:underline font-medium transition"
                       >
                         Terms of Service
                       </a>{" "}
@@ -7650,14 +7841,14 @@ export default function Home() {
                         href="/privacy"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 underline font-semibold transition"
+                        className="text-[#0070f3] hover:underline font-medium transition"
                       >
                         Privacy Policy
                       </a>
                       .
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1.5">
-                      Cloud backup writes strictly to your hidden Google Drive AppData folder. We never read or access your personal files.
+                    <p className="text-[10px] text-[#888888] mt-1.5 font-mono">
+                      Cloud backup writes strictly to your hidden Google Drive AppData folder.
                     </p>
                   </div>
                 </div>
@@ -7665,9 +7856,9 @@ export default function Home() {
                 /* Authenticated View */
                 <div className="space-y-4">
                   {/* Student Profile Card */}
-                  <div className="p-4 rounded-2xl bg-[#08080f] border border-white/[0.08] flex items-center justify-between gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 border border-indigo-400/30 flex items-center justify-center text-white font-black text-sm shadow-md shrink-0 overflow-hidden">
+                      <div className="h-10 w-10 rounded-full bg-[#171717] dark:bg-[#ededed] flex items-center justify-center text-white dark:text-[#0a0a0a] font-semibold text-sm shrink-0 overflow-hidden">
                         {cloudUser.picture ? (
                           <img src={cloudUser.picture} alt={cloudUser.name} className="h-full w-full object-cover" />
                         ) : (
@@ -7676,57 +7867,54 @@ export default function Home() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="text-xs font-black text-white truncate">{cloudUser.name}</h4>
-                          <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                          <h4 className="text-xs font-semibold text-[#171717] dark:text-[#ededed] truncate">{cloudUser.name}</h4>
+                          <span className="text-[9px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
                             <ShieldCheck className="h-3 w-3" />
-                            Verified BRACU Student
+                            Verified
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono truncate mt-0.5">{cloudUser.email}</p>
+                        <p className="text-[11px] text-[#666666] dark:text-[#888888] font-mono truncate mt-0.5">{cloudUser.email}</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleCloudSignOut}
-                      className="px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 border border-white/[0.08] hover:border-rose-500/40 text-slate-400 hover:text-rose-300 text-[11px] font-bold transition cursor-pointer shrink-0"
+                      className="h-8 px-3 rounded-lg bg-white dark:bg-[#181818] hover:bg-rose-500/10 border border-[#e5e5e5] dark:border-[#2a2a2a] hover:border-rose-500/30 text-[#666666] dark:text-[#888888] hover:text-rose-600 dark:hover:text-rose-400 text-xs font-medium transition cursor-pointer shrink-0"
                     >
                       Sign Out
                     </button>
                   </div>
 
                   {/* Sync Details & Status Card */}
-                  <div className="p-4 rounded-2xl bg-[#06060a] border border-white/[0.06] space-y-3">
+                  <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Drive Sync Status</span>
-                      <span className="flex items-center gap-1.5 font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-0.5 rounded-lg text-[11px]">
-                        <span className="relative flex h-1.5 w-1.5 shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                        </span>
+                      <span className="text-[#666666] dark:text-[#888888]">Drive Sync Status</span>
+                      <span className="flex items-center gap-1.5 font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded text-[11px]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                         <span>{cloudSyncStatus === 'syncing' ? 'Syncing Now...' : 'Connected & Synced'}</span>
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs border-t border-white/[0.04] pt-2.5">
-                      <span className="text-slate-400 font-medium">Last Cloud Backup</span>
-                      <span className="text-slate-200 font-mono font-bold text-[11px]">
+                    <div className="flex items-center justify-between text-xs border-t border-[#ebebeb] dark:border-[#222222] pt-2.5">
+                      <span className="text-[#666666] dark:text-[#888888]">Last Cloud Backup</span>
+                      <span className="text-[#171717] dark:text-[#ededed] font-mono font-medium text-[11px]">
                         {formatSyncTimestamp(cloudLastSync)}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs border-t border-white/[0.04] pt-2.5">
-                      <span className="text-slate-400 font-medium">Active Degree Plan</span>
-                      <span className="text-indigo-300 font-bold text-[11px]">
+                    <div className="flex items-center justify-between text-xs border-t border-[#ebebeb] dark:border-[#222222] pt-2.5">
+                      <span className="text-[#666666] dark:text-[#888888]">Active Degree Plan</span>
+                      <span className="text-[#0070f3] font-mono font-medium text-[11px]">
                         {cumulativeStats?.completedCredits ?? 0} / 136 Cr Completed
                       </span>
                     </div>
                   </div>
 
                   {/* Auto-Sync Toggle */}
-                  <div className="p-3.5 rounded-2xl bg-[#08080f] border border-white/[0.08] flex items-center justify-between gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] flex items-center justify-between gap-3">
                     <div>
-                      <h5 className="text-xs font-bold text-white">Automated Auto-Save</h5>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Automatically sync changes to Google Drive in the background</p>
+                      <h5 className="text-xs font-semibold text-[#171717] dark:text-[#ededed]">Automated Auto-Save</h5>
+                      <p className="text-[11px] text-[#666666] dark:text-[#888888] mt-0.5">Automatically sync changes to Google Drive in the background</p>
                     </div>
                     <button
                       type="button"
@@ -7735,12 +7923,12 @@ export default function Home() {
                         setIsAutoSyncEnabled(next);
                         localStorage.setItem(STORAGE_KEYS.AUTO_SYNC, String(next));
                       }}
-                      className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
-                        isAutoSyncEnabled ? 'bg-indigo-600' : 'bg-white/10'
+                      className={`w-10 h-5.5 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                        isAutoSyncEnabled ? 'bg-[#0070f3]' : 'bg-[#e5e5e5] dark:bg-[#2a2a2a]'
                       }`}
                     >
-                      <div className={`h-4 w-4 rounded-full bg-white transition-transform absolute top-1 ${
-                        isAutoSyncEnabled ? 'left-6' : 'left-1'
+                      <div className={`h-4 w-4 rounded-full bg-white transition-transform absolute top-[3px] ${
+                        isAutoSyncEnabled ? 'left-[21px]' : 'left-[3px]'
                       }`} />
                     </button>
                   </div>
@@ -7751,7 +7939,7 @@ export default function Home() {
                       type="button"
                       disabled={cloudSyncStatus === 'syncing'}
                       onClick={() => performCloudSync()}
-                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      className="flex-1 h-9 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`h-3.5 w-3.5 ${cloudSyncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                       <span>{cloudSyncStatus === 'syncing' ? "Syncing..." : "Sync Now"}</span>
@@ -7782,9 +7970,9 @@ export default function Home() {
                           showCloudToast(err?.message || "Failed to restore from Google Drive.");
                         }
                       }}
-                      className="flex-1 py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-200 hover:text-white text-xs font-bold rounded-2xl flex items-center justify-center gap-2 transition cursor-pointer"
+                      className="flex-1 h-9 bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition cursor-pointer"
                     >
-                      <Download className="h-3.5 w-3.5 text-indigo-400" />
+                      <Download className="h-3.5 w-3.5 text-[#0070f3]" />
                       <span>Restore from Drive</span>
                     </button>
                   </div>
@@ -7794,13 +7982,13 @@ export default function Home() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-white/[0.08] bg-[#0e0e14]/50 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-[11px] text-slate-400">
+            <div className="p-4 border-t border-[#ebebeb] dark:border-[#262626] bg-[#fafafa] dark:bg-[#111111] flex items-center justify-between">
+              <div className="flex items-center gap-2.5 text-[11px] text-[#666666] dark:text-[#888888]">
                 <a
                   href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-300 underline transition"
+                  className="hover:text-[#171717] dark:hover:text-[#ededed] underline transition"
                 >
                   Privacy Policy
                 </a>
@@ -7809,7 +7997,7 @@ export default function Home() {
                   href="/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-300 underline transition"
+                  className="hover:text-[#171717] dark:hover:text-[#ededed] underline transition"
                 >
                   Terms of Service
                 </a>
@@ -7820,7 +8008,7 @@ export default function Home() {
                   setShowCloudModal(false);
                   setGatekeeperError(null);
                 }}
-                className="px-5 py-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+                className="h-8 px-4 bg-white dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] rounded-lg text-xs font-medium text-[#171717] dark:text-[#ededed] transition cursor-pointer"
               >
                 Close
               </button>
@@ -7831,30 +8019,30 @@ export default function Home() {
 
       {/* Cloud Remote Conflict / Initial Found Modal */}
       {showCloudConflictModal && cloudConflictPayload && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-[#08080d]/98 border border-white/[0.12] rounded-3xl w-full max-w-md shadow-2xl p-6 space-y-4 relative">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] rounded-2xl w-full max-w-md shadow-vercel-modal p-5 sm:p-6 space-y-4 relative text-[#171717] dark:text-[#ededed]">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                <Cloud className="h-5 w-5" />
+              <div className="w-9 h-9 rounded-lg bg-[#f5f5f5] dark:bg-[#181818] border border-[#e5e5e5] dark:border-[#2a2a2a] flex items-center justify-center text-[#0070f3] shrink-0">
+                <Cloud className="h-4.5 w-4.5" />
               </div>
               <div>
-                <h4 className="text-base font-black text-white">Cloud Curriculum Found</h4>
-                <p className="text-xs text-slate-400 mt-0.5">Existing backup on Google Drive</p>
+                <h4 className="text-sm sm:text-base font-semibold text-[#171717] dark:text-[#ededed]">Cloud Curriculum Found</h4>
+                <p className="text-xs text-[#666666] dark:text-[#888888] mt-0.5">Existing backup on Google Drive</p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[#0c0c14] border border-white/[0.06] text-xs space-y-2 text-slate-300">
+            <div className="p-3.5 rounded-xl bg-[#fafafa] dark:bg-[#111111] border border-[#ebebeb] dark:border-[#242424] text-xs space-y-2.5 text-[#4d4d4d] dark:text-[#a1a1a1]">
               <p>
-                An existing Flow136 curriculum backup was found on your Google Drive:
+                An existing Route136 curriculum backup was found on your Google Drive:
               </p>
-              <div className="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 p-2.5 rounded-xl space-y-1">
+              <div className="text-[11px] font-mono text-[#171717] dark:text-[#ededed] bg-white dark:bg-[#181818] border border-[#ebebeb] dark:border-[#262626] p-2.5 rounded-lg space-y-1">
                 <div>Backup Date: <strong>{formatSyncTimestamp(cloudConflictPayload.updatedAt)}</strong></div>
                 <div>Semesters: <strong>{cloudConflictPayload.semesters?.length ?? 0} semesters planned</strong></div>
                 {cloudConflictPayload.statsSummary && (
                   <div>Credits: <strong>{cloudConflictPayload.statsSummary.completedCredits} completed</strong></div>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[#666666] dark:text-[#888888]">
                 Would you like to restore this cloud plan, or overwrite it with your current local plan?
               </p>
             </div>
@@ -7866,14 +8054,14 @@ export default function Home() {
                   setShowCloudConflictModal(false);
                   performCloudSync();
                 }}
-                className="flex-1 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-slate-300 text-xs font-bold rounded-2xl transition cursor-pointer"
+                className="flex-1 h-9 bg-[#fafafa] dark:bg-[#181818] hover:bg-[#f0f0f0] dark:hover:bg-[#222222] border border-[#e5e5e5] dark:border-[#2a2a2a] text-[#171717] dark:text-[#ededed] text-xs font-medium rounded-lg transition cursor-pointer"
               >
                 Keep Local Plan
               </button>
               <button
                 type="button"
                 onClick={() => handleRestoreFromCloud()}
-                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-2xl shadow-md shadow-blue-600/25 transition cursor-pointer"
+                className="flex-1 h-9 bg-[#171717] dark:bg-[#ededed] hover:bg-black/90 dark:hover:bg-white text-white dark:text-[#0a0a0a] text-xs font-medium rounded-lg shadow-vercel-subtle transition cursor-pointer"
               >
                 Restore Cloud Plan
               </button>
@@ -7885,8 +8073,8 @@ export default function Home() {
       {/* Floating Cloud Toast Notification */}
       {cloudToastMessage && (
         <div className="fixed bottom-24 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-200 pointer-events-none">
-          <div className="bg-[#071710]/95 border border-emerald-500/35 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl flex items-center gap-2.5">
-            <Cloud className="h-4 w-4 text-emerald-400 shrink-0 animate-pulse" />
+          <div className="bg-white dark:bg-[#0c0c0c] border border-[#ebebeb] dark:border-[#262626] text-[#171717] dark:text-[#ededed] text-xs font-mono px-4 py-2.5 rounded-full shadow-vercel-modal flex items-center gap-2">
+            <Cloud className="h-4 w-4 text-[#0070f3] shrink-0 animate-pulse" />
             <span>{cloudToastMessage}</span>
           </div>
         </div>
